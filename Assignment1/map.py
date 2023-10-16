@@ -1,77 +1,125 @@
+from copy import deepcopy
 from typing import Tuple, List
 from enum import Enum
+from neighbourhoods import in_moore, in_von_neumann, in_moore_with_ears
 
 
-class Actors(str, Enum):
+class Entity(str, Enum):
     HULK = "H"
     INFINITY_STONE = "I"
     THOR = "T"
     CAPTAIN_MARVEL = "M"
     SHIELD = "S"
-    THANOS = "A"
+    PERCEPTION = "P"
     EMPTY = "."
+    PATH = "*"
 
 
-# class Direction(Enum):
-#     PLUS_Y = (0, 1)
-#     MINUS_Y = (0, -1)
-#     PLUS_X = (1, 0)
-#     MINUS_X = (-1, 0)
+class Direction(Enum):
+    PLUS_Y = (0, 1)
+    MINUS_Y = (0, -1)
+    PLUS_X = (1, 0)
+    MINUS_X = (-1, 0)
 
 
 class Map:
     """Map looks like this:
-    (0, 0)------(n, 0)> +x
+    (0, 0)------(0, n)> +y
       |
       |
       |
-    (0, n)
-      V +y
+    (n, 0)
+      V +x
     """
 
-    __n = 9  # size of the map
-
-    def __init__(self, infinity_stone: Tuple[int, int]):
-        """Initialize an unknown map with an infinity stone.
-
-        Args:
-            infinity_stone (Tuple[int, int]): Coordinates of infinity stone (x, y)
-        """
-        assert 0 <= infinity_stone[0] <= 8 and 0 <= infinity_stone[1] <= 8, "Infinity stone is out of the map"
-
-        self.__map: List[List[Actors]] = [
-            [Actors.EMPTY for _ in range(self.__n)] for _ in range(self.__n)
+    def __init__(self, n: int = 9):
+        """Initialize an unknown map."""
+        self.__n = n
+        self.__map: List[List[Entity]] = [
+            [Entity.EMPTY for _ in range(self.__n)] for _ in range(self.__n)
         ]  # map itself
-        self.__thanos = [0, 0]
-        self.__map[self.__thanos[1]][self.__thanos[0]] = Actors.THANOS
-        self.__map[infinity_stone[1]][infinity_stone[0]] = Actors.INFINITY_STONE
 
-    def put(self, cell: Tuple[int, int], actor: Actors) -> None:
+    def put(self, cell: Tuple[int, int], entity: Entity) -> None:
         assert 0 <= cell[0] <= 8 and 0 <= cell[1] <= 8, f"Cell {cell} is out of the map"
-        if actor != Actors.EMPTY:
+        if entity != Entity.EMPTY and entity != Entity.PERCEPTION and entity != Entity.PATH:
+            if self.__map[cell[0]][cell[1]] == entity:
+                return
             for row in self.__map:
-                assert actor not in row, f"Actor {actor} is present in the map"
-        assert self.__map[cell[1]][cell[0]] == Actors.EMPTY, f"Cell {cell} is occupied by another actor"
+                assert entity not in row, f"Entity {entity} is present in the map"
 
-        self.__map[cell[1]][cell[0]] = actor
+        if entity == Entity.PERCEPTION and self.__map[cell[0]][cell[1]] != Entity.EMPTY:
+            return
 
-    # def moveThanos(self, direction: Direction):
-    #     if direction == Direction.MINUS_X:
-    #         assert self.__thanos[0] > 0, "Thanos will be out of the map"
-    #     if direction == Direction.PLUS_X:
-    #         assert self.__thanos[0] < self.__n, "Thanos will be out of the map"
-    #     if direction == Direction.MINUS_Y:
-    #         assert self.__thanos[1] > 0, "Thanos will be out of the map"
-    #     if direction == Direction.PLUS_Y:
-    #         assert self.__thanos[1] < self.__n, "Thanos will be out of the map"
+        self.__map[cell[0]][cell[1]] = entity
 
-    #     self.__map[self.__thanos[1]][self.__thanos[0]] = Actors.EMPTY
-    #     self.__thanos[0] += direction.value[0]
-    #     self.__thanos[1] += direction.value[1]
+        if entity in (Entity.HULK, Entity.CAPTAIN_MARVEL, Entity.THOR):
+            self.__populate_perception(entity, cell)
 
-    #     assert self.__map[self.__thanos[1]][self.__thanos[0]] == Actors.EMPTY, "Cell is occupied by another actor"
+    def get(self, cell: Tuple[int, int]) -> Entity:
+        assert 0 <= cell[0] <= 8 and 0 <= cell[1] <= 8, f"Cell {cell} is out of the map"
+        return self.__map[cell[0]][cell[1]]
 
-    #     self.__map[self.__thanos[1]][self.__thanos[0]] = Actors.THANOS
+    def get_location(self, entity: Entity) -> Tuple[int, int]:
+        for i in range(self.__n):
+            for j in range(self.__n):
+                if self.__map[i][j] == entity:
+                    return (i, j)
+        raise ValueError(f"Entity {entity} is not found")
+
+    def can_move(self, pos: Tuple[int, int], direction: Direction, shielded: bool) -> Tuple[bool, Tuple[int, int]]:
+        possible = False
+        if direction == Direction.MINUS_X:
+            possible = pos[0] > 0
+        elif direction == Direction.PLUS_X:
+            possible = pos[0] < self.__n - 1
+        elif direction == Direction.MINUS_Y:
+            possible = pos[1] > 0
+        elif direction == Direction.PLUS_Y:
+            possible = pos[1] < self.__n - 1
+
+        new_pos = (pos[0] + direction.value[0], pos[1] + direction.value[1])
+        if possible:
+            possible = self.__map[new_pos[0]][new_pos[1]] in [Entity.EMPTY, Entity.SHIELD, Entity.INFINITY_STONE] + (
+                [Entity.PERCEPTION] if shielded else []
+            )
+
+        return (possible, new_pos)
+
+    def __populate_perception(self, entity: Entity, center: Tuple[int, int]):
+        for i in range(self.__n):
+            for j in range(self.__n):
+                if self.__map[i][j] != Entity.EMPTY:
+                    continue
+                if entity == Entity.HULK:
+                    if in_von_neumann((i, j), center, 1):
+                        self.__map[i][j] = Entity.PERCEPTION
+                elif entity == Entity.CAPTAIN_MARVEL:
+                    if in_von_neumann((i, j), center, 2):
+                        self.__map[i][j] = Entity.PERCEPTION
+                elif entity == Entity.THOR:
+                    if in_moore((i, j), center):
+                        self.__map[i][j] = Entity.PERCEPTION
+
+    def get_surroundings(self, perception: int, cell: Tuple[int, int]) -> List[Tuple[Tuple[int, int], Entity]]:
+        output = []
+        for i in range(self.__n):
+            for j in range(self.__n):
+                if self.__map[i][j] == Entity.EMPTY:
+                    continue
+                if perception == 1:
+                    if in_moore((i, j), cell):
+                        output.append(((i, j), self.__map[i][j]))
+                elif perception == 2:
+                    if in_moore_with_ears((i, j), cell):
+                        output.append(((i, j), self.__map[i][j]))
+        return output
+
+    def load(self, path: str) -> None:
+        with open(path) as fp:
+            for i, line in enumerate(fp):
+                for j, entity in enumerate(line.split()):
+                    if entity != Entity.EMPTY:
+                        self.put((i, j), Entity(entity))
 
     def __str__(self) -> str:
         output = ""
@@ -81,21 +129,10 @@ class Map:
 
 
 def main():
-    m = Map((2, 3))
-    m.put((1, 2), Actors.HULK)
+    m = Map()
+    m.put((2, 3), Entity.INFINITY_STONE)
+    m.put((1, 2), Entity.HULK)
     print(m)
-    # for _ in range(7):
-    #     m.moveThanos(Direction.PLUS_X)
-    # print(m)
-    # for _ in range(7):
-    #     m.moveThanos(Direction.PLUS_Y)
-    # print(m)
-    # for _ in range(7):
-    #     m.moveThanos(Direction.MINUS_X)
-    # print(m)
-    # for _ in range(7):
-    #     m.moveThanos(Direction.MINUS_Y)
-    # print(m)
 
 
 if __name__ == "__main__":
