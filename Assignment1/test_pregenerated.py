@@ -32,6 +32,7 @@ def main():
     tests = glob.glob(os.path.join(args.t, "*.txt"))
     for test in tests:
         print("-" * 20 + test + "-" * 20)
+
         map_ = Map()
         map_.load(test)
         print(map_)
@@ -39,10 +40,13 @@ def main():
         prev_cell = (0, 0)
         shielded = False
         variant_number = randint(1, 2)
+
         start_time = time.time()
+
         proc = pexpect.spawn(f"{args.p} {args.i}", timeout=TIMEOUT)
         proc.sendline(f"{variant_number}")
         proc.sendline(f"{map_.get_location(Entity.INFINITY_STONE)[0]} {map_.get_location(Entity.INFINITY_STONE)[1]}")
+
         while True:
             ind = proc.expect([pexpect.EOF, pexpect.TIMEOUT, "\nm \\d \\d", "\ne \\d"])
             if ind == 0:
@@ -98,6 +102,7 @@ def main():
                     prev_cell = move_cell
                 if map_.get(move_cell) == Entity.SHIELD:
                     shielded = True
+
                 surroundings = map_.get_surroundings(variant_number, move_cell)
                 proc.sendline(f"{len(surroundings)}")
                 for cell, entity in surroundings:
@@ -106,7 +111,9 @@ def main():
                 output = proc.after.decode("utf-8")
                 print(output)
                 break
+
         end_time = time.time()
+
         fp.write(f"{test},{0},{end_time - start_time}\n")
         print("-" * (40 + len(test)))
 
