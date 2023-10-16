@@ -1,6 +1,9 @@
 to_send/
 local_tests/
 
+*.csv
+*.ods
+
 ## Core latex/pdflatex auxiliary files:
 *.aux
 *.lof
