@@ -1,4 +1,5 @@
 to_send/
+local_tests/
 
 ## Core latex/pdflatex auxiliary files:
 *.aux
