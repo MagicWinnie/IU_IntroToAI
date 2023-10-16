@@ -1,7 +1,7 @@
 import time
 from random import randint, seed
 from typing import Tuple
-from map import Map, Actors
+from map import Map, Entity
 from neighbourhoods import in_moore, in_von_neumann
 
 
@@ -68,11 +68,12 @@ def create_map() -> Map:
     shield = create_shield(captain_marvel, hulk, thor)
     infinity_stone = create_infinity_stone(shield, captain_marvel, hulk, thor)
 
-    m = Map(infinity_stone)
-    m.put(thor, Actors.THOR)
-    m.put(hulk, Actors.HULK)
-    m.put(captain_marvel, Actors.CAPTAIN_MARVEL)
-    m.put(shield, Actors.SHIELD)
+    m = Map()
+    m.put(thor, Entity.THOR)
+    m.put(hulk, Entity.HULK)
+    m.put(captain_marvel, Entity.CAPTAIN_MARVEL)
+    m.put(shield, Entity.SHIELD)
+    m.put(infinity_stone, Entity.INFINITY_STONE)
 
     return m
 
