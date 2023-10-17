@@ -40,7 +40,7 @@ class Map:
         ]  # map itself
 
     def put(self, cell: Tuple[int, int], entity: Entity) -> None:
-        assert 0 <= cell[0] <= 8 and 0 <= cell[1] <= 8, f"Cell {cell} is out of the map"
+        assert 0 <= cell[0] <= self.__n and 0 <= cell[1] <= self.__n, f"Cell {cell} is out of the map"
         if entity != Entity.EMPTY and entity != Entity.PERCEPTION and entity != Entity.PATH:
             if self.__map[cell[0]][cell[1]] == entity:
                 return
@@ -56,7 +56,7 @@ class Map:
             self.__populate_perception(entity, cell)
 
     def get(self, cell: Tuple[int, int]) -> Entity:
-        assert 0 <= cell[0] <= 8 and 0 <= cell[1] <= 8, f"Cell {cell} is out of the map"
+        assert 0 <= cell[0] <= self.__n and 0 <= cell[1] <= self.__n, f"Cell {cell} is out of the map"
         return self.__map[cell[0]][cell[1]]
 
     def get_location(self, entity: Entity) -> Tuple[int, int]:

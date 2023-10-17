@@ -31,13 +31,16 @@ def create_captain_marvel(
             return captain_marvel
 
 
-def create_shield(captain_marvel: Tuple[int, int], hulk: Tuple[int, int], thor: Tuple[int, int]) -> Tuple[int, int]:
+def create_shield(
+    captain_marvel: Tuple[int, int], hulk: Tuple[int, int], thor: Tuple[int, int], thanos: Tuple[int, int] = (0, 0)
+) -> Tuple[int, int]:
     while True:
         shield = (randint(0, 8), randint(0, 8))
         if (
             not in_von_neumann(shield, captain_marvel, 2)
             and not in_von_neumann(shield, hulk, 1)
             and not in_moore(shield, thor)
+            and shield != thanos
         ):
             return shield
 
