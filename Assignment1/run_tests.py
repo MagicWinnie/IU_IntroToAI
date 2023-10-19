@@ -46,20 +46,21 @@ def main():
         start_time = time.time()
 
         proc = pexpect.spawn(f"{args.cmd} {args.file}", timeout=TIMEOUT)
+        proc.delaybeforesend = 0.01
         proc.sendline(f"{variant_number}")
         proc.sendline(f"{map_.get_location(Entity.INFINITY_STONE)[0]} {map_.get_location(Entity.INFINITY_STONE)[1]}")
 
         while True:
             ind = proc.expect([pexpect.EOF, pexpect.TIMEOUT, "\nm \\d \\d", "\ne \\d"])
             if ind == 0:
-                print(f"[ERROR] EOF while running {args.i}:")
+                print(f"[ERROR] EOF while running {args.file}:")
                 print("-" * 50)
                 print(proc.before.decode("utf-8"))
                 print("-" * 50)
                 fp.close()
                 exit(1)
             elif ind == 1:
-                print(f"[ERROR] Did not receive any output while running {args.i} in {TIMEOUT} seconds:")
+                print(f"[ERROR] Did not receive any output while running {args.file} in {TIMEOUT} seconds:")
                 print("-" * 50)
                 print(proc.before.decode("utf-8"))
                 print("-" * 50)
@@ -116,12 +117,12 @@ def main():
                     proc.sendline(f"{cell[0]} {cell[1]} {entity.value}")
             elif ind == 3:
                 output = proc.after.decode("utf-8")
-                print(output)
+                print("[INFO] Output:")
+                print(output.strip())
+                end_time = time.time()
+                fp.write(f"{test},{output.strip().split()[1]},{end_time - start_time}\n")
                 break
 
-        end_time = time.time()
-
-        fp.write(f"{test},{0},{end_time - start_time}\n")
         print("-" * (40 + len(test)))
 
     fp.close()
