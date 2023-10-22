@@ -67,6 +67,8 @@ def main():
         variant_number = randint(1, 2)
         infinity_stone = map_.get_location(Entity.INFINITY_STONE)
 
+        print("Variant number:", variant_number)
+
         proc = pexpect.spawn(f"{args.cmd} {args.file}", timeout=TIMEOUT)
         proc.delaybeforesend = 0.01
 
