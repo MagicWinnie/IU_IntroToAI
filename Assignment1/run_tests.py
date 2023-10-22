@@ -22,10 +22,10 @@ def parse_args() -> Namespace:
         required=True,
     )
     parser.add_argument(
-        "-f",
-        "--file",
+        "-c",
+        "--cmd",
         type=str,
-        help="Path to the program to run",
+        help='Command to execute program (e.g. "python3 main.py" or "./main.out")',
         required=True,
     )
     parser.add_argument(
@@ -34,13 +34,6 @@ def parse_args() -> Namespace:
         type=str,
         help="Path to the output csv file",
         default="output.csv",
-    )
-    parser.add_argument(
-        "-c",
-        "--cmd",
-        type=str,
-        help="Command to execute program (e.g. python interpreter: python3 or /usr/bin/python3.8)",
-        default="/usr/bin/python3.8",
     )
     return parser.parse_args()
 
@@ -69,7 +62,7 @@ def main():
 
         print("Variant number:", variant_number)
 
-        proc = pexpect.spawn(f"{args.cmd} {args.file}", timeout=TIMEOUT)
+        proc = pexpect.spawn(args.cmd, timeout=TIMEOUT)
         proc.delaybeforesend = 0.01
 
         start_time = time.time()
@@ -80,14 +73,14 @@ def main():
         while True:
             ind = proc.expect([pexpect.EOF, pexpect.TIMEOUT, "\nm \\d \\d\r\n", "\ne \\d\r\n"])
             if ind == 0:
-                print(f"[ERROR] EOF while running {args.file}:")
+                print(f"[ERROR] Received EOF:")
                 print("-" * DASH_LENGTH)
                 print(proc.before.decode("utf-8").strip())
                 print("-" * DASH_LENGTH)
                 fp.close()
                 exit(1)
             elif ind == 1:
-                print(f"[ERROR] Did not receive any output while running {args.file} in {TIMEOUT} seconds:")
+                print(f"[ERROR] Did not receive any output in {TIMEOUT} seconds:")
                 print("-" * DASH_LENGTH)
                 print(proc.before.decode("utf-8").strip())
                 print("-" * DASH_LENGTH)
