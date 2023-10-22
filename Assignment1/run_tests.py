@@ -78,9 +78,9 @@ def main():
         proc.sendline(f"{infinity_stone[0]} {infinity_stone[1]}")
 
         while True:
-            ind = proc.expect([pexpect.EOF, pexpect.TIMEOUT, "\nm \\d \\d\r\n", "\ne \\d\r\n"])
+            ind = proc.expect([pexpect.EOF, pexpect.TIMEOUT, "\nm \\d+ \\d+\r?\n", "e -?\\d+\r?\n"])
             if ind == 0:
-                print(f"[ERROR] Received EOF:")
+                print(f"[ERROR] Unmatched output (negative coordinates, incorrect dialogue?):")
                 print("-" * DASH_LENGTH)
                 print(proc.before.decode("utf-8").strip())
                 print("-" * DASH_LENGTH)
