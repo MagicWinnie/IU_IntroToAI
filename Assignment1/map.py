@@ -134,7 +134,7 @@ class Map:
         output = ""
         for row in self.__map:
             output += " ".join(row) + "\n"
-        return output
+        return output[:-1]
 
 
 def main():
