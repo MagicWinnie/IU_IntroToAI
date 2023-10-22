@@ -29,6 +29,13 @@ def parse_args() -> Namespace:
         required=True,
     )
     parser.add_argument(
+        "-v",
+        "--variant",
+        type=int,
+        help="Which perception variant to use for Thanos (randomly chosen if not 1 or not 2)",
+        default=0,
+    )
+    parser.add_argument(
         "-o",
         "--output",
         type=str,
@@ -57,7 +64,7 @@ def main():
         print(map_)
 
         prev_cell = (0, 0)
-        variant_number = randint(1, 2)
+        variant_number = args.variant if args.variant in (1, 2) else randint(1, 2)
         infinity_stone = map_.get_location(Entity.INFINITY_STONE)
 
         print("Variant number:", variant_number)
