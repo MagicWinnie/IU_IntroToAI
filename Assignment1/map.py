@@ -1,4 +1,3 @@
-from copy import deepcopy
 from typing import Tuple, List
 from enum import Enum
 from neighbourhoods import in_moore, in_von_neumann, in_moore_with_ears
@@ -24,7 +23,7 @@ class Direction(Enum):
 
 class Map:
     """Map looks like this:
-    (0, 0)------(0, n)> +y
+    (0, 0)——————(0, n)> +y
       |
       |
       |
@@ -35,12 +34,9 @@ class Map:
     def __init__(self, n: int = 9):
         """Initialize an unknown map."""
         self.__n = n
-        self.__map: List[List[Entity]] = [
-            [Entity.EMPTY for _ in range(self.__n)] for _ in range(self.__n)
-        ]  # map itself
+        self.__map: List[List[Entity]] = [[Entity.EMPTY for _ in range(self.__n)] for _ in range(self.__n)]
 
     def put(self, cell: Tuple[int, int], entity: Entity) -> None:
-        assert 0 <= cell[0] <= self.__n and 0 <= cell[1] <= self.__n, f"Cell {cell} is out of the map"
         if entity != Entity.EMPTY and entity != Entity.PERCEPTION and entity != Entity.PATH:
             if self.__map[cell[0]][cell[1]] == entity:
                 return
@@ -56,7 +52,6 @@ class Map:
             self.__populate_perception(entity, cell)
 
     def get(self, cell: Tuple[int, int]) -> Entity:
-        assert 0 <= cell[0] <= self.__n and 0 <= cell[1] <= self.__n, f"Cell {cell} is out of the map"
         return self.__map[cell[0]][cell[1]]
 
     def get_location(self, entity: Entity) -> Tuple[int, int]:
@@ -79,9 +74,7 @@ class Map:
 
         new_pos = (pos[0] + direction.value[0], pos[1] + direction.value[1])
         if possible:
-            possible = self.__map[new_pos[0]][new_pos[1]] in [Entity.EMPTY, Entity.SHIELD, Entity.INFINITY_STONE] + (
-                [Entity.PERCEPTION] if shielded else []
-            )
+            possible = self.__map[new_pos[0]][new_pos[1]] in (Entity.EMPTY, Entity.SHIELD, Entity.INFINITY_STONE)
 
         return (possible, new_pos)
 
@@ -99,6 +92,22 @@ class Map:
                 elif entity == Entity.THOR:
                     if in_moore((i, j), center):
                         self.__map[i][j] = Entity.PERCEPTION
+
+    def remove_perception(self, entity: Entity):
+        center = self.get_location(entity)
+        for i in range(self.__n):
+            for j in range(self.__n):
+                if self.__map[i][j] != Entity.PERCEPTION:
+                    continue
+                if entity == Entity.HULK:
+                    if in_von_neumann((i, j), center, 1):
+                        self.__map[i][j] = Entity.EMPTY
+                elif entity == Entity.CAPTAIN_MARVEL:
+                    if in_von_neumann((i, j), center, 2):
+                        self.__map[i][j] = Entity.EMPTY
+                elif entity == Entity.THOR:
+                    if in_moore((i, j), center):
+                        self.__map[i][j] = Entity.EMPTY
 
     def get_surroundings(self, perception: int, cell: Tuple[int, int]) -> List[Tuple[Tuple[int, int], Entity]]:
         output = []
