@@ -56,7 +56,7 @@ def main():
     fp.write("TEST,ANSWER,TIME\n")
 
     tests = glob.glob(os.path.join(args.tests, "*.txt"))
-    for test in tests:
+    for test in sorted(tests):
         print("-" * (DASH_LENGTH // 2) + test + "-" * (DASH_LENGTH // 2))
 
         map_ = Map()
