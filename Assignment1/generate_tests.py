@@ -99,7 +99,7 @@ def main():
                 created_maps.add(str(map_))
                 break
 
-        with open(os.path.join(args.o, f"test_{i}.txt"), "w") as fp:
+        with open(os.path.join(args.output, f"test_{i}.txt"), "w") as fp:
             fp.write(str(map_))
 
 
