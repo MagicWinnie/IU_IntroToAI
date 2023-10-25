@@ -13,7 +13,7 @@ def parse_args() -> Namespace:
         "-t",
         "--tests",
         type=str,
-        help="Path to the tests folder",
+        help="Path to the tests folder or a single file",
         required=True,
     )
     parser.add_argument(
@@ -49,7 +49,10 @@ def main():
     fp = open(args.output, "w")
     fp.write("TEST,ANSWER,TIME\n")
 
-    tests = glob.glob(os.path.join(args.tests, "*.txt"))
+    if os.path.isdir(args.tests):
+        tests = glob.glob(os.path.join(args.tests, "*.txt"))
+    else:
+        tests = [args.tests]
     for test in sorted(tests):
         print("-" * (DASH_LENGTH // 2) + test + "-" * (DASH_LENGTH // 2))
 
