@@ -1,15 +1,10 @@
 import os
 import glob
 import time
+import subprocess
 from random import randint
 from argparse import ArgumentParser, Namespace
 from map import Map, Entity
-
-try:
-    import pexpect
-except ModuleNotFoundError:
-    print("[ERROR] Install pexpect: pip install pexpect")
-    exit(1)
 
 
 def parse_args() -> Namespace:
@@ -45,7 +40,6 @@ def parse_args() -> Namespace:
     return parser.parse_args()
 
 
-TIMEOUT = 2  # seconds
 DASH_LENGTH = 50
 
 
@@ -69,39 +63,40 @@ def main():
 
         print("Variant number:", variant_number)
 
-        proc = pexpect.spawn(args.cmd, timeout=TIMEOUT)
-        proc.delaybeforesend = 0.01
+        proc = subprocess.Popen(
+            args.cmd,
+            shell=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if not proc.stdin or not proc.stdout or not proc.stderr:
+            print("[ERROR] stdin, stdout, or stderr in subprocess.Popen is not assigned to subprocess.PIPE")
+            fp.close()
+            exit(1)
 
         start_time = time.time()
 
-        proc.sendline(f"{variant_number}")
-        proc.sendline(f"{infinity_stone[0]} {infinity_stone[1]}")
+        proc.stdin.write(f"{variant_number}\n".encode("ASCII"))
+        proc.stdin.write(f"{infinity_stone[0]} {infinity_stone[1]}\n".encode("ASCII"))
+        proc.stdin.flush()
 
         while True:
-            ind = proc.expect([pexpect.EOF, pexpect.TIMEOUT, "\nm \\d+ \\d+\r?\n", "e -?\\d+\r?\n"])
-            if ind == 0:
-                print(f"[ERROR] Unmatched output (negative coordinates, incorrect dialogue?):")
+            output = proc.stdout.readline().decode("ASCII").strip()
+            if not output:
+                print("[ERROR] An exception was raised while running:")
                 print("-" * DASH_LENGTH)
-                print(proc.before.decode("utf-8").strip())
-                print("-" * DASH_LENGTH)
-                fp.close()
-                exit(1)
-            elif ind == 1:
-                print(f"[ERROR] Did not receive any output in {TIMEOUT} seconds:")
-                print("-" * DASH_LENGTH)
-                print(proc.before.decode("utf-8").strip())
+                for line in proc.stderr.readlines():
+                    print(line.decode("ASCII").rstrip())
                 print("-" * DASH_LENGTH)
                 fp.close()
                 exit(1)
-            elif ind == 2:
-                output = proc.after.decode("utf-8")
+            elif output[0] == "m":
                 _, x, y = output.split()
                 move_cell = (int(x), int(y))
                 if abs(move_cell[0] - prev_cell[0]) + abs(move_cell[1] - prev_cell[1]) > 1:
                     print(f"[ERROR] Can't teleport:")
                     print("-" * DASH_LENGTH)
-                    print("Previous output:")
-                    print(proc.before.decode("utf-8").strip())
                     print("Tried to move to cell:")
                     print(move_cell)
                     print("From cell:")
@@ -112,8 +107,6 @@ def main():
                 elif map_.get(move_cell) in (Entity.CAPTAIN_MARVEL, Entity.HULK, Entity.THOR):
                     print(f"[ERROR] Can't move into a cell with Avengers:")
                     print("-" * DASH_LENGTH)
-                    print("Previous output:")
-                    print(proc.before.decode("utf-8").strip())
                     print("Tried to move to cell:")
                     print(move_cell)
                     print("From cell:")
@@ -124,8 +117,6 @@ def main():
                 elif map_.get(move_cell) == Entity.PERCEPTION:
                     print(f"[ERROR] Can't move into perception zone of Avengers:")
                     print("-" * DASH_LENGTH)
-                    print("Previous output:")
-                    print(proc.before.decode("utf-8").strip())
                     print("Tried to move to cell:")
                     print(move_cell)
                     print("From cell:")
@@ -140,11 +131,11 @@ def main():
                     map_.remove_perception(Entity.THOR)
 
                 surroundings = map_.get_surroundings(variant_number, move_cell)
-                proc.sendline(f"{len(surroundings)}")
+                proc.stdin.write(f"{len(surroundings)}\n".encode("ASCII"))
                 for cell, entity in surroundings:
-                    proc.sendline(f"{cell[0]} {cell[1]} {entity.value}")
-            elif ind == 3:
-                output = proc.after.decode("utf-8").strip()
+                    proc.stdin.write(f"{cell[0]} {cell[1]} {entity.value}\n".encode("ASCII"))
+                proc.stdin.flush()
+            elif output[0] == "e":
                 print("[INFO] Output:")
                 print(output)
                 end_time = time.time()
