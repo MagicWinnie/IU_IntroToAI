@@ -15,6 +15,12 @@ class Entity(str, Enum):
     EMPTY = "."
     PATH = "*"
 
+    def __str__(self):
+        return self.value
+
+    def __repr__(self):
+        return self.value
+
 
 def possible_moves(pos: Tuple[int, int]) -> List[Tuple[int, int]]:
     moves: List[Tuple[int, int]] = []
@@ -58,6 +64,9 @@ def dfs(
     global path_to_goal, path_to_shield, visited
 
     # print(start, file=open("backtracking.log", "a"))
+    # for row in map_:
+    #     print(" ".join(row), file=open("backtracking.log", "a"))
+    # print(file=open("backtracking.log", "a"))
     visited[start[0]][start[1]] = True
     path.append(start)
     ask_to_move(map_, start)
