@@ -69,6 +69,7 @@ def dfs(
     if start == goal:
         if not path_to_goal or len(path) < len(path_to_goal):
             path_to_goal = path.copy()
+        return
 
     for new_cell in possible_moves(start):
         if visited[new_cell[0]][new_cell[1]]:
@@ -100,7 +101,7 @@ def dfs_shortest(
     if start == goal:
         if not path_to_goal or len(path) < len(path_to_goal):
             path_to_goal = path.copy()
-    elif (not path_to_goal or len(path) < len(path_to_goal)) and len(path) < N * N:
+    elif (not path_to_goal or len(path) < len(path_to_goal)) and len(path) < N * N / 3.75:
         for new_cell in sorted(possible_moves(start), key=lambda pt: (goal[0] - pt[0]) + (goal[1] - pt[1])):
             if visited[new_cell[0]][new_cell[1]]:
                 continue
