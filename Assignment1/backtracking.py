@@ -1,7 +1,5 @@
 from typing import Tuple, List
 from enum import Enum
-from functools import lru_cache
-from pprint import pprint
 
 
 N = 9
@@ -88,7 +86,6 @@ def dfs(
         path.append(start)
 
 
-# @lru_cache(maxsize=None)
 def dfs_shortest(
     map_: List[List[Entity]],
     start: Tuple[int, int],
@@ -127,53 +124,45 @@ def main():
     x, y = map(int, input().split())
     goal = (x, y)
     start = (0, 0)
-
     shield = (-1, -1)
 
     without_shield_map = [[Entity.EMPTY for _ in range(N)] for _ in range(N)]
     dfs(without_shield_map, start, goal)  # explore map from start without picking up shield
+
     for i in range(N):
         for j in range(N):
             if without_shield_map[i][j] == Entity.SHIELD:
                 shield = (i, j)
+
     if visited[goal[0]][goal[1]]:
         visited = [[False for _ in range(N)] for _ in range(N)]
-        # print("DFS SHORT 1", file=open("backtracking.log", "a"))
         dfs_shortest(without_shield_map, start, goal)
 
     if shield != (-1, -1):
         with_shield_map = [x[:] for x in without_shield_map]
+
         # move to shield
         for cell in path_to_shield[:-1]:
             ask_to_move(with_shield_map, cell)
+
         # remove perception zones from map
         for i in range(N):
             for j in range(N):
                 if with_shield_map[i][j] == Entity.PERCEPTION:
                     with_shield_map[i][j] = Entity.EMPTY
+
         visited = [[False for _ in range(N)] for _ in range(N)]
         dfs(with_shield_map, shield, goal)  # explore map from shield
-        # print("PT 1", file=open("backtracking.log", "a"))
+
         if visited[goal[0]][goal[1]]:
-            visited = [[False for _ in range(N)] for _ in range(N)]
             # find shortest path to shield
-            # print("DFS SHORT 2", file=open("backtracking.log", "a"))
-            dfs_shortest(with_shield_map, start, shield)
-            # print("PT 2", file=open("backtracking.log", "a"))
-
             visited = [[False for _ in range(N)] for _ in range(N)]
+            dfs_shortest(with_shield_map, start, shield)
+
             # find shortest path to goal
-            # print("DFS SHORT 3", file=open("backtracking.log", "a"))
+            visited = [[False for _ in range(N)] for _ in range(N)]
             dfs_shortest(with_shield_map, shield, goal, path_to_shield[:-1])
-            # print("PT 3", file=open("backtracking.log", "a"))
 
-    # for cell in path_to_goal:
-    #     map_[cell[0]][cell[1]] = Entity.PATH
-    # for row in map_:
-    #     print(" ".join(row), file=open("backtracking.log", "a"))
-    # print("-" * 100, file=open("backtracking.log", "a"))
-
-    # print(path_to_goal, file=open("backtracking.log", "a"))
     print(f"e {len(path_to_goal) - 1}")
 
 
