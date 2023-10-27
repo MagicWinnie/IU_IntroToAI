@@ -115,8 +115,6 @@ def a_star(
         for neighbor in possible_moves(current):
             if not can_move(map_, neighbor):
                 continue
-            # if map_[neighbor[0]][neighbor[1]] == Entity.SHIELD:
-            #     continue
 
             # d(current,neighbor) is the weight of the edge from current to neighbor
             # tentative_gScore is the distance from start to the neighbor through current
@@ -126,7 +124,6 @@ def a_star(
                 came_from[neighbor] = current
                 g_score[neighbor[0]][neighbor[1]] = tentative_g_score
                 f_score[neighbor[0]][neighbor[1]] = tentative_g_score + h(neighbor, goal)
-                # if not all(neighbor in item for item in open_set.queue):
                 open_set.put((f_score[neighbor[0]][neighbor[1]], neighbor))
 
     # Open set is empty but goal was never reached
@@ -134,23 +131,15 @@ def a_star(
 
 
 def main():
-    # open("a_star.log", "w").close()
-
     map_: List[List[Entity]] = [[Entity.EMPTY for _ in range(N)] for _ in range(N)]
 
     variant_number = int(input())
     x, y = map(int, input().split())
     goal = (x, y)
     start = (0, 0)
-    shield = (-1, -1)
 
     min_path = a_star(map_, start, goal, heuristics)
     print(f"e {len(min_path) - 1}")
-
-    # for cell in min_path:
-    #     map_[cell[0]][cell[1]] = Entity.PATH
-    # for row in map_:
-    #     print(" ".join(row), file=open("a_star.log", "a"))
 
 
 if __name__ == "__main__":
