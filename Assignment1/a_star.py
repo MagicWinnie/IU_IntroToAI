@@ -1,13 +1,19 @@
-from typing import Tuple, List, Dict, Callable
+from typing import List, Dict, Callable
 from enum import Enum
+from dataclasses import dataclass
 from queue import PriorityQueue
-from pprint import pprint
 
 
-N = 9
+N = 9  # size of the map (NxN)
 
 
 class Entity(str, Enum):
+    """
+    Enum for enitites that can be found on the map:
+        Hulk, Thor, Captain Marvel, Infinity Stone, Shield, and Perception Zone.
+    Note: EMPTY and PATH are technical entities.
+    """
+
     HULK = "H"
     INFINITY_STONE = "I"
     THOR = "T"
@@ -24,109 +30,188 @@ class Entity(str, Enum):
         return self.value
 
 
-def possible_moves(pos: Tuple[int, int]) -> List[Tuple[int, int]]:
-    moves: List[Tuple[int, int]] = []
-    if pos[0] > 0:
-        moves.append((pos[0] - 1, pos[1]))
-    if pos[0] < N - 1:
-        moves.append((pos[0] + 1, pos[1]))
-    if pos[1] > 0:
-        moves.append((pos[0], pos[1] - 1))
-    if pos[1] < N - 1:
-        moves.append((pos[0], pos[1] + 1))
+@dataclass(order=True, unsafe_hash=True)
+class Cell:
+    """
+    Dataclass that represents the coordinates (x, y) for a cell.
+    """
+
+    x: int
+    y: int
+
+    def __add__(self, other: "Cell") -> "Cell":
+        return Cell(self.x + other.x, self.y + other.y)
+
+    def manhattan(self, other: "Cell") -> int:
+        """Returns manhattan distance from current cell to `other`.
+
+        Args:
+            other (Cell): Another cell for calculating distance to.
+
+        Returns:
+            int: Manhattan distance to `other`.
+        """
+        return abs(self.x - other.x) + abs(self.y - other.y)
+
+
+def possible_moves(pos: Cell) -> List[Cell]:
+    """Returns a list of possible moves from `pos` cell.
+    Note: it checks only for out of bounds and does not check for obstacles.
+
+    Args:
+        pos (Cell): Cell to start from.
+
+    Returns:
+        List[Cell]: Possible moves from `pos`.
+    """
+    moves: List[Cell] = []
+    # we can move up, down, left, right
+    if pos.x > 0:
+        moves.append(pos + Cell(-1, 0))
+    if pos.x < N - 1:
+        moves.append(pos + Cell(1, 0))
+    if pos.y > 0:
+        moves.append(pos + Cell(0, -1))
+    if pos.y < N - 1:
+        moves.append(pos + Cell(0, 1))
     return moves
 
 
-def can_move(map_: List[List[Entity]], pos: Tuple[int, int]) -> bool:
-    return map_[pos[0]][pos[1]] in (Entity.INFINITY_STONE, Entity.SHIELD, Entity.EMPTY)
+def can_move(map_: List[List[Entity]], pos: Cell) -> bool:
+    """Returns whether one can move into `pos`.
+    Note: it checks only for obstacles and does not check for out of bounds.
+
+    Args:
+        map_ (List[List[Entity]]): Map.
+        pos (Cell): Cell that one wants to move into.
+
+    Returns:
+        bool: Whether one can move into `pos`.
+    """
+    # we can move into a cell which does not contain obstacles
+    return map_[pos.x][pos.y] not in (Entity.CAPTAIN_MARVEL, Entity.HULK, Entity.THOR, Entity.PERCEPTION)
 
 
-def ask_to_move(map_: List[List[Entity]], pos: Tuple[int, int]) -> None:
-    print(f"m {pos[0]} {pos[1]}")
+def ask_to_move(map_: List[List[Entity]], pos: Cell) -> None:
+    """Ask the interactor to move into `pos` and gather information about surroundings.
+
+    Args:
+        map_ (List[List[Entity]]): Map.
+        pos (Cell): Cell that one wants to move into.
+    """
+    print(f"m {pos.x} {pos.y}")
     n = int(input())
     for _ in range(n):
         x, y, e = input().split()
-        cell = (int(x), int(y))
-        entity = Entity(e)
-        map_[cell[0]][cell[1]] = entity
+        map_[int(x)][int(y)] = Entity(e)
 
 
-def heuristics(start: Tuple[int, int], goal: Tuple[int, int]) -> float:
-    distance = abs(start[0] - goal[0]) + abs(start[1] - goal[1])
-    return distance
+def heuristics(start: Cell, goal: Cell) -> float:
+    """Heuristics function for A*. Returns manhattan distance between `start` and `goal`.
+
+    Args:
+        start (Cell): Start cell.
+        goal (Cell): Goal cell.
+
+    Returns:
+        float: Manhattan distance between `start` and `goal`.
+    """
+    return start.manhattan(goal)
 
 
-def reconstruct_path(
-    came_from: Dict[Tuple[int, int], Tuple[int, int]], current: Tuple[int, int]
-) -> List[Tuple[int, int]]:
-    total_path: List[Tuple[int, int]] = [current]
-    while current in came_from.keys():
-        current = came_from[current]
+def reconstruct_path(parent: Dict[Cell, Cell], current: Cell) -> List[Cell]:
+    """Reconstructs the path based on `parent` dictionary and the `goal` cell.
+
+    Args:
+        parent (Dict[Cell, Cell]): Parent dictionary.
+        current (Cell): `goal` cell.
+
+    Returns:
+        List[Cell]: Path from `start` to `goal`.
+    """
+    total_path: List[Cell] = [current]
+    while current in parent.keys():
+        current = parent[current]
         total_path = [current] + total_path
     return total_path
 
 
 def a_star(
     map_: List[List[Entity]],
-    start: Tuple[int, int],
-    goal: Tuple[int, int],
-    h: Callable[[Tuple[int, int], Tuple[int, int]], float],
-) -> List[Tuple[int, int]]:
+    start: Cell,
+    goal: Cell,
+    h: Callable[[Cell, Cell], float],
+) -> List[Cell]:
+    """A* search algorithm implementation.
+    Based on pseudocode from https://en.wikipedia.org/wiki/A*_search_algorithm
+
+    Args:
+        map_ (List[List[Entity]]): Map.
+        start (Cell): Start cell.
+        goal (Cell): Goal cell.
+        h (Callable[[Cell, Cell], float]): Function for heuristics.
+
+    Returns:
+        List[Cell]: Shortest path from `start` to `goal` (empty list if not found)
     """
-    Direct translation of pseudocode from https://en.wikipedia.org/wiki/A*_search_algorithm
-    """
-    # The set of discovered nodes that may need to be (re-)expanded.
-    # Initially, only the start node is known.
-    # This is usually implemented as a min-heap or priority queue rather than a hash-set.
+    # set of discovered cells that may need to be (re-)expanded
     open_set = PriorityQueue()
     open_set.put((0, start))
 
-    # For node n, cameFrom[n] is the node immediately preceding it on the cheapest path from the start
-    # to n currently known.
-    came_from: Dict[Tuple[int, int], Tuple[int, int]] = {}
+    # parent dictionary (stores the closest parent)
+    parent: Dict[Cell, Cell] = {}
 
-    # For node n, gScore[n] is the cost of the cheapest path from start to n currently known.
+    # g_score[x][y] is the shortest distance from `start` to `Cell(x, y)`
     g_score: List[List[float]] = [[float("inf") for _ in range(N)] for _ in range(N)]
-    g_score[start[0]][start[1]] = 0
+    g_score[start.x][start.y] = 0
 
-    # For node n, fScore[n] := gScore[n] + h(n). fScore[n] represents our current best guess as to
-    # how cheap a path could be from start to finish if it goes through n.
+    # f_score[x][y] is the guess for the shortest distance from `start` to `goal` through `Cell(x, y)`
     f_score: List[List[float]] = [[float("inf") for _ in range(N)] for _ in range(N)]
-    f_score[start[0]][start[1]] = h(start, goal)
+    f_score[start.x][start.y] = h(start, goal)
 
-    previous = (0, 0)
+    # previous visited cell
+    previous = Cell(0, 0)
     while not open_set.empty():
-        # This operation can occur in O(Log(N)) time if openSet is a min-heap or a priority queue
-        _, current = open_set.get()
-        if map_[current[0]][current[1]] == Entity.SHIELD:
-            pass
-        if current == goal:
-            return reconstruct_path(came_from, current)
+        # get the cell with the lowest f_score
+        current: Cell = open_set.get()[1]
 
-        if abs(previous[0] - current[0]) + abs(previous[1] - current[1]) != 1:
-            for cell in reconstruct_path(came_from, previous)[::-1]:
+        # when we reach the destination we can reconstruct the path
+        if current == goal:
+            return reconstruct_path(parent, current)
+
+        # move the interactor from the previous cell to the current one to prevent teleportation
+        if current.manhattan(previous) != 1:
+            # move through cells from `previous` to `start`
+            for cell in reconstruct_path(parent, previous)[::-1]:
                 ask_to_move(map_, cell)
-            for cell in reconstruct_path(came_from, current)[1:]:
+            # move through cells from `start` to preceding of current
+            for cell in reconstruct_path(parent, current)[1:]:
                 ask_to_move(map_, cell)
+        # move to the current cell
         ask_to_move(map_, current)
 
         previous = current
 
+        # check the neighbors
         for neighbor in possible_moves(current):
+            # check that we can move there and not meet enemies
             if not can_move(map_, neighbor):
                 continue
 
-            # d(current,neighbor) is the weight of the edge from current to neighbor
-            # tentative_gScore is the distance from start to the neighbor through current
-            tentative_g_score = g_score[current[0]][current[1]] + 1
-            if tentative_g_score < g_score[neighbor[0]][neighbor[1]]:
-                # This path to neighbor is better than any previous one. Record it!
-                came_from[neighbor] = current
-                g_score[neighbor[0]][neighbor[1]] = tentative_g_score
-                f_score[neighbor[0]][neighbor[1]] = tentative_g_score + h(neighbor, goal)
-                open_set.put((f_score[neighbor[0]][neighbor[1]], neighbor))
+            # distance from `start` to the `neighbor` through `current`
+            g_score_neighbor = g_score[current.x][current.y] + 1
+            # if we found a shorter path
+            if g_score_neighbor < g_score[neighbor.x][neighbor.y]:
+                # update the parent
+                parent[neighbor] = current
+                # update the `g_score`
+                g_score[neighbor.x][neighbor.y] = g_score_neighbor
+                # update the `f_score`
+                f_score[neighbor.x][neighbor.y] = g_score_neighbor + h(neighbor, goal)
+                # add the neighbor for future exploration
+                open_set.put((f_score[neighbor.x][neighbor.y], neighbor))
 
-    # Open set is empty but goal was never reached
+    # path from `start` to `goal` does not exist
     return []
 
 
@@ -135,10 +220,13 @@ def main():
 
     variant_number = int(input())
     x, y = map(int, input().split())
-    goal = (x, y)
-    start = (0, 0)
+    goal = Cell(x, y)
+    start = Cell(0, 0)
 
+    # explore the map with A*
     min_path = a_star(map_, start, goal, heuristics)
+    # print the length of the shortest path from `start` to `goal`
+    # note: if path_to_goal is empty, then -1 will be printed
     print(f"e {len(min_path) - 1}")
 
 
