@@ -95,7 +95,7 @@ def a_star(
     f_score[start[0]][start[1]] = h(start, goal)
 
     previous = (0, 0)
-    while open_set:
+    while not open_set.empty():
         # This operation can occur in O(Log(N)) time if openSet is a min-heap or a priority queue
         _, current = open_set.get()
         if map_[current[0]][current[1]] == Entity.SHIELD:
@@ -103,10 +103,11 @@ def a_star(
         if current == goal:
             return reconstruct_path(came_from, current)
 
-        for cell in reconstruct_path(came_from, previous)[::-1]:
-            ask_to_move(map_, cell)
-        for cell in reconstruct_path(came_from, current)[1:]:
-            ask_to_move(map_, cell)
+        if abs(previous[0] - current[0]) + abs(previous[1] - current[1]) != 1:
+            for cell in reconstruct_path(came_from, previous)[::-1]:
+                ask_to_move(map_, cell)
+            for cell in reconstruct_path(came_from, current)[1:]:
+                ask_to_move(map_, cell)
         ask_to_move(map_, current)
 
         previous = current
@@ -125,6 +126,7 @@ def a_star(
                 came_from[neighbor] = current
                 g_score[neighbor[0]][neighbor[1]] = tentative_g_score
                 f_score[neighbor[0]][neighbor[1]] = tentative_g_score + h(neighbor, goal)
+                # if not all(neighbor in item for item in open_set.queue):
                 open_set.put((f_score[neighbor[0]][neighbor[1]], neighbor))
 
     # Open set is empty but goal was never reached
@@ -132,7 +134,7 @@ def a_star(
 
 
 def main():
-    open("a_star.log", "w").close()
+    # open("a_star.log", "w").close()
 
     map_: List[List[Entity]] = [[Entity.EMPTY for _ in range(N)] for _ in range(N)]
 
