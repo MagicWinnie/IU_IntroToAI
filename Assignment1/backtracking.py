@@ -274,8 +274,8 @@ def main():
         for cell in path_to_shield[:-1]:
             ask_to_move(with_shield_map, cell)
 
-        # remove perception zones from our map
-        # perception zone for captain marvel will reappear as we use the interactor
+        # remove the perception zones from our map
+        # perception zone for Captain Marvel will reappear as we use the interactor
         for i in range(N):
             for j in range(N):
                 if with_shield_map[i][j] == Entity.PERCEPTION:
@@ -291,7 +291,7 @@ def main():
             # then we find the shortest path from the shield to the goal
             dfs_shortest(with_shield_map, shield, goal, path_to_shield[:-1])
 
-    # finally print the length
+    # print the length of the shortest path from `start` to `goal`
     # note: if path_to_goal is empty, then -1 will be printed
     print(f"e {len(path_to_goal) - 1}")
 
