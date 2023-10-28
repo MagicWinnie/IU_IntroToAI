@@ -223,8 +223,7 @@ def main():
                     proc.stdin.write(f"{cell.x} {cell.y} {entity.value}\n".encode("ASCII"))
                 proc.stdin.flush()
             elif output[0] == "e":
-                print("[INFO] Output:")
-                print(output)
+                print("Output:", output)
                 end_time = time.time()
                 fp.write(f"{test},{output.split()[1]},{end_time - start_time}\n")
                 break
