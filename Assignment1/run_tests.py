@@ -1,4 +1,5 @@
 import os
+import re
 import glob
 import time
 import subprocess
@@ -11,6 +12,7 @@ from argparse import ArgumentParser, Namespace
 
 N = 9  # size of the map (NxN)
 DASH_LENGTH = 50
+FILE_PATTERN = re.compile(r'.*?(\d+).*?')
 
 
 class Entity(str, Enum):
@@ -86,6 +88,13 @@ def illegal_move(msg: str, curr: Cell, future: Cell):
     print("-" * DASH_LENGTH)
 
 
+def get_order(file: str):
+    match = FILE_PATTERN.match(os.path.splitext(os.path.basename(file))[0])
+    if not match:
+        return float('inf')
+    return int(match.groups()[0])
+
+
 def parse_args() -> Namespace:
     parser = ArgumentParser()
     parser.add_argument(
@@ -129,7 +138,7 @@ def main():
         tests = glob.glob(os.path.join(args.tests, "*.txt"))
     else:
         tests = [args.tests]
-    for test in sorted(tests):
+    for test in sorted(tests, key=get_order):
         print("-" * (DASH_LENGTH // 2) + test + "-" * (DASH_LENGTH // 2))
 
         map_ = [[Entity.EMPTY for _ in range(N)] for _ in range(N)]
