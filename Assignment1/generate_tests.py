@@ -168,7 +168,7 @@ def main():
                 created_maps.add(str(map_))
                 break
 
-        with open(os.path.join(args.output, f"test_{i}.txt"), "w") as fp:
+        with open(os.path.join(args.output, f"{i}.txt"), "w") as fp:
             for row in map_:
                 fp.write(" ".join(row) + "\n")
 
