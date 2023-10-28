@@ -10,7 +10,7 @@ class Entity(str, Enum):
     """
     Enum for enitites that can be found on the map:
         Hulk, Thor, Captain Marvel, Infinity Stone, Shield, and Perception Zone.
-    Note: EMPTY and PATH are technical entities.
+    Note: EMPTY, WALL, and PATH are technical entities.
     """
 
     HULK = "H"
@@ -21,6 +21,7 @@ class Entity(str, Enum):
     PERCEPTION = "P"
     EMPTY = "."
     PATH = "*"
+    WALL = "W"
 
     def __str__(self):
         return self.value
@@ -88,7 +89,7 @@ def can_move(map_: List[List[Entity]], pos: Cell) -> bool:
         bool: Whether one can move into `pos`.
     """
     # we can move into a cell which does not contain obstacles
-    return map_[pos.x][pos.y] not in (Entity.CAPTAIN_MARVEL, Entity.HULK, Entity.THOR, Entity.PERCEPTION)
+    return map_[pos.x][pos.y] not in (Entity.CAPTAIN_MARVEL, Entity.HULK, Entity.THOR, Entity.PERCEPTION, Entity.WALL)
 
 
 def ask_to_move(map_: List[List[Entity]], pos: Cell) -> None:
@@ -103,6 +104,56 @@ def ask_to_move(map_: List[List[Entity]], pos: Cell) -> None:
     for _ in range(n):
         x, y, e = input().split()
         map_[int(x)][int(y)] = Entity(e)
+
+
+def put_walls(map_: List[List[Entity]]):
+    """Put walls onto the map such that there are paths between all necessary cells.
+
+    Args:
+        map_ (List[List[Entity]]): Map.
+    """
+    for i in range(N):
+        for j in range(N):
+            # do not obstruct our way from (0, 0)
+            if i + j < 2:
+                continue
+            # we are putting walls only on the empty cells
+            if map_[i][j] != Entity.EMPTY:
+                continue
+            # check if there is some entity on north
+            if i > 0:
+                if map_[i - 1][j] not in (Entity.EMPTY, Entity.WALL):
+                    continue
+            # check if there is some entity on north-east
+            if i > 0 and j < N - 1:
+                if map_[i - 1][j + 1] not in (Entity.EMPTY, Entity.WALL):
+                    continue
+            # check if there is some entity on east
+            if j < N - 1:
+                if map_[i][j + 1] not in (Entity.EMPTY, Entity.WALL):
+                    continue
+            # check if there is some entity on south-east
+            if i < N - 1 and j < N - 1:
+                if map_[i + 1][j + 1] not in (Entity.EMPTY, Entity.WALL):
+                    continue
+            # check if there is some entity on south
+            if i < N - 1:
+                if map_[i + 1][j] not in (Entity.EMPTY, Entity.WALL):
+                    continue
+            # check if there is some entity on south-west
+            if i < N - 1 and j > 0:
+                if map_[i + 1][j - 1] not in (Entity.EMPTY, Entity.WALL):
+                    continue
+            # check if there is some entity on west
+            if j > 0:
+                if map_[i][j - 1] not in (Entity.EMPTY, Entity.WALL):
+                    continue
+            # check if there is some entity on north-west
+            if i > 0 and j > 0:
+                if map_[i - 1][j - 1] not in (Entity.EMPTY, Entity.WALL):
+                    continue
+            # if the cell is surrounding by EMPTY or WALL cells then we can put a WALL
+            map_[i][j] = Entity.WALL
 
 
 path_to_goal: List[Cell] = []  # contains the shortest path to our goal (infinity stone)
@@ -215,26 +266,24 @@ def dfs_shortest(
         if not path_to_goal or len(path) < len(path_to_goal):
             path_to_goal = path.copy()
     elif not path_to_goal or len(path) < len(path_to_goal):
-        # discard too lengthy paths (coefficient was chosen so all tests are passed)
-        if len(path) < N * N / 3.75:
-            # visit neighbours in such manner that we check the ones with smaller distance first
-            for new_cell in sorted(possible_moves(start), key=goal.manhattan):
-                # check that we did not visit it
-                if visited[new_cell.x][new_cell.y]:
-                    continue
-                # check that we can move there and not meet enemies
-                if not can_move(map_, new_cell):
-                    continue
-                # if we encounter a shield
-                if map_[new_cell.x][new_cell.y] == Entity.SHIELD:
-                    # update the path to it
-                    if not path_to_shield or len(path) + 1 < len(path_to_shield):
-                        path_to_shield = path.copy() + [new_cell]
-                    # do not grab it
-                    continue
+        # visit neighbours in such manner that we check the ones with smaller distance first
+        for new_cell in sorted(possible_moves(start), key=goal.manhattan):
+            # check that we did not visit it
+            if visited[new_cell.x][new_cell.y]:
+                continue
+            # check that we can move there and not meet enemies
+            if not can_move(map_, new_cell):
+                continue
+            # if we encounter a shield
+            if map_[new_cell.x][new_cell.y] == Entity.SHIELD:
+                # update the path to it
+                if not path_to_shield or len(path) + 1 < len(path_to_shield):
+                    path_to_shield = path.copy() + [new_cell]
+                # do not grab it
+                continue
 
-                # exploit the neighbour
-                dfs_shortest(map_, new_cell, goal, path, False)
+            # exploit the neighbour
+            dfs_shortest(map_, new_cell, goal, path, False)
 
     # backtracking:
     # unmark the cell, so we can visit it in the future
@@ -265,9 +314,8 @@ def main():
     # if we have reached the goal then we can find the shortest path to it (explore then exploit)
     if visited[goal.x][goal.y]:
         dfs_shortest(without_shield_map, start, goal)
-
     # if we have found the shield in the first exploration
-    if shield != Cell(-1, -1):
+    if shield != Cell(-1, -1) and path_to_shield:
         with_shield_map = [x[:] for x in without_shield_map]
 
         # move to the shield
@@ -286,11 +334,14 @@ def main():
 
         # if we have reached the goal then we can find the shortest path to it (explore then exploit)
         if visited[goal.x][goal.y]:
+            # put walls in empty cells not surrounded by characters
+            # this way we reduce our map to a maze where paths have width of only 1 cell
+            # therefore, much reducing the amount of processed paths
+            put_walls(with_shield_map)
             # first we find the shortest path to the shield
             dfs_shortest(with_shield_map, start, shield)
             # then we find the shortest path from the shield to the goal
             dfs_shortest(with_shield_map, shield, goal, path_to_shield[:-1])
-
     # print the length of the shortest path from `start` to `goal`
     # note: if path_to_goal is empty, then -1 will be printed
     print(f"e {len(path_to_goal) - 1}")
