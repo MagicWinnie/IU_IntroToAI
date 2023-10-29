@@ -1,141 +1,112 @@
 import os
 import time
-from enum import Enum
 from typing import List, Set
 from random import randint, seed
 from argparse import ArgumentParser
-from dataclasses import dataclass
 
 
 N = 9  # size of the map (NxN)
 seed(time.time())
 
 
-class Entity(str, Enum):
-    HULK = "H"
-    INFINITY_STONE = "I"
-    THOR = "T"
-    CAPTAIN_MARVEL = "M"
-    SHIELD = "S"
-    PERCEPTION = "P"
-    EMPTY = "."
-    PATH = "*"
-
-    def __str__(self):
-        return self.value
-
-    def __repr__(self):
-        return self.value
+def m_dist(this, other) -> int:
+    return abs(this[0] - other[0]) + abs(this[1] - other[1])
 
 
-@dataclass
-class Cell:
-    x: int
-    y: int
-
-    def __add__(self, other: "Cell") -> "Cell":
-        return Cell(self.x + other.x, self.y + other.y)
-
-    def manhattan(self, other: "Cell") -> int:
-        return abs(self.x - other.x) + abs(self.y - other.y)
+def moore_perception_zone(point, center, r=1) -> bool:
+    return abs(point[0] - center[0]) <= r and abs(point[1] - center[1]) <= r
 
 
-def in_moore(point: Cell, center: Cell, r: int = 1) -> bool:
-    return abs(point.x - center.x) <= r and abs(point.y - center.y) <= r
+def vonneumann_perception_zone(point, center, r) -> bool:
+    return m_dist(point, center) <= r
 
 
-def in_von_neumann(point: Cell, center: Cell, r: int) -> bool:
-    return point.manhattan(center) <= r
-
-
-def create_thor(thanos: Cell = Cell(0, 0)) -> Cell:
+def create_thor(thanos=(0, 0)):
     while True:
-        thor = Cell(randint(0, N - 1), randint(0, N - 1))
-        if not in_moore(thanos, thor):
+        thor = (randint(0, N - 1), randint(0, N - 1))
+        if not moore_perception_zone(thanos, thor):
             return thor
 
 
-def create_hulk(thor: Cell, thanos: Cell = Cell(0, 0)) -> Cell:
+def create_hulk(thor, thanos=(0, 0)):
     while True:
-        hulk = Cell(randint(0, N - 1), randint(0, N - 1))
-        if thor != hulk and not in_von_neumann(thanos, hulk, 1):
+        hulk = (randint(0, N - 1), randint(0, N - 1))
+        if thor != hulk and not vonneumann_perception_zone(thanos, hulk, 1):
             return hulk
 
 
-def create_captain_marvel(hulk: Cell, thor: Cell, thanos: Cell = Cell(0, 0)) -> Cell:
+def create_captain_marvel(hulk, thor, thanos=(0, 0)):
     while True:
-        captain_marvel = Cell(randint(0, N - 1), randint(0, N - 1))
-        if hulk != captain_marvel and thor != captain_marvel and not in_von_neumann(thanos, captain_marvel, 2):
+        captain_marvel = (randint(0, N - 1), randint(0, N - 1))
+        if (
+            hulk != captain_marvel
+            and thor != captain_marvel
+            and not vonneumann_perception_zone(thanos, captain_marvel, 2)
+        ):
             return captain_marvel
 
 
-def create_shield(captain_marvel: Cell, hulk: Cell, thor: Cell, thanos: Cell = Cell(0, 0)) -> Cell:
+def create_shield(captain_marvel, hulk, thor, thanos=(0, 0)):
     while True:
-        shield = Cell(randint(0, N - 1), randint(0, N - 1))
+        shield = (randint(0, N - 1), randint(0, N - 1))
         if (
-            not in_von_neumann(shield, captain_marvel, 2)
-            and not in_von_neumann(shield, hulk, 1)
-            and not in_moore(shield, thor)
+            not vonneumann_perception_zone(shield, captain_marvel, 2)
+            and not vonneumann_perception_zone(shield, hulk, 1)
+            and not moore_perception_zone(shield, thor)
             and shield != thanos
         ):
             return shield
 
 
-def create_infinity_stone(
-    shield: Cell,
-    captain_marvel: Cell,
-    hulk: Cell,
-    thor: Cell,
-    thanos: Cell = Cell(0, 0),
-) -> Cell:
+def create_infinity_stone(shield, captain_marvel, hulk, thor, thanos=(0, 0)):
     while True:
-        infinity_stone = Cell(randint(0, N - 1), randint(0, N - 1))
+        infinity_stone = (randint(0, N - 1), randint(0, N - 1))
         if (
-            not in_von_neumann(infinity_stone, captain_marvel, 2)
-            and not in_von_neumann(infinity_stone, hulk, 1)
-            and not in_moore(infinity_stone, thor)
+            not vonneumann_perception_zone(infinity_stone, captain_marvel, 2)
+            and not vonneumann_perception_zone(infinity_stone, hulk, 1)
+            and not moore_perception_zone(infinity_stone, thor)
             and infinity_stone != shield
             and infinity_stone != thanos
         ):
             return infinity_stone
 
 
-def populate_perception(map_: List[List[Entity]], entity: Entity, center: Cell):
+def populate_perception(map_, entity, center):
     for i in range(N):
         for j in range(N):
-            if map_[i][j] != Entity.EMPTY:
+            if map_[i][j] != ".":
                 continue
-            if entity == Entity.HULK:
-                if in_von_neumann(Cell(i, j), center, 1):
-                    map_[i][j] = Entity.PERCEPTION
-            elif entity == Entity.CAPTAIN_MARVEL:
-                if in_von_neumann(Cell(i, j), center, 2):
-                    map_[i][j] = Entity.PERCEPTION
-            elif entity == Entity.THOR:
-                if in_moore(Cell(i, j), center):
-                    map_[i][j] = Entity.PERCEPTION
+            if entity == "H":
+                if vonneumann_perception_zone((i, j), center, 1):
+                    map_[i][j] = "P"
+            elif entity == "M":
+                if vonneumann_perception_zone((i, j), center, 2):
+                    map_[i][j] = "P"
+            elif entity == "T":
+                if moore_perception_zone((i, j), center):
+                    map_[i][j] = "P"
 
 
-def create_map() -> List[List[Entity]]:
+def create_map() -> List[List[str]]:
     thor = create_thor()
     hulk = create_hulk(thor)
     captain_marvel = create_captain_marvel(hulk, thor)
     shield = create_shield(captain_marvel, hulk, thor)
     infinity_stone = create_infinity_stone(shield, captain_marvel, hulk, thor)
 
-    map_ = [[Entity.EMPTY for _ in range(N)] for _ in range(N)]
+    map_ = [["." for _ in range(N)] for _ in range(N)]
 
-    map_[thor.x][thor.y] = Entity.THOR
-    populate_perception(map_, Entity.THOR, thor)
+    map_[thor[0]][thor[1]] = "T"
+    populate_perception(map_, "T", thor)
 
-    map_[hulk.x][hulk.y] = Entity.HULK
-    populate_perception(map_, Entity.HULK, hulk)
+    map_[hulk[0]][hulk[1]] = "H"
+    populate_perception(map_, "H", hulk)
 
-    map_[captain_marvel.x][captain_marvel.y] = Entity.CAPTAIN_MARVEL
-    populate_perception(map_, Entity.CAPTAIN_MARVEL, captain_marvel)
+    map_[captain_marvel[0]][captain_marvel[1]] = "M"
+    populate_perception(map_, "M", captain_marvel)
 
-    map_[shield.x][shield.y] = Entity.SHIELD
-    map_[infinity_stone.x][infinity_stone.y] = Entity.INFINITY_STONE
+    map_[shield[0]][shield[1]] = "S"
+    map_[infinity_stone[0]][infinity_stone[1]] = "I"
 
     return map_
 
