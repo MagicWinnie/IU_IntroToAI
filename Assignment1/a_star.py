@@ -141,6 +141,8 @@ def a_star(
     start: Cell,
     goal: Cell,
     h: Callable[[Cell, Cell], float],
+    grab_shield: bool,
+    go_to_start_after_finish: bool,
 ) -> List[Cell]:
     """A* search algorithm implementation.
     Based on pseudocode from https://en.wikipedia.org/wiki/A*_search_algorithm
@@ -150,6 +152,8 @@ def a_star(
         start (Cell): Start cell.
         goal (Cell): Goal cell.
         h (Callable[[Cell, Cell], float]): Function for heuristics.
+        grab_shield (bool): Whether to grab the shield.
+        go_to_start_after_finish (bool): Whether to go back to the start after finishing.
 
     Returns:
         List[Cell]: Shortest path from `start` to `goal` (empty list if not found)
@@ -170,14 +174,10 @@ def a_star(
     f_score[start.x][start.y] = h(start, goal)
 
     # previous visited cell
-    previous = Cell(0, 0)
+    previous = start
     while not open_set.empty():
         # get the cell with the lowest f_score
         current: Cell = open_set.get()[1]
-
-        # when we reach the destination we can reconstruct the path
-        if current == goal:
-            return reconstruct_path(parent, current)
 
         # move the interactor from the previous cell to the current one to prevent teleportation
         if current.manhattan(previous) != 1:
@@ -190,12 +190,21 @@ def a_star(
         # move to the current cell
         ask_to_move(map_, current)
 
+        # when we reach the destination we can reconstruct the path
+        if current == goal:
+            if go_to_start_after_finish:
+                for cell in reconstruct_path(parent, current)[::-1]:
+                    ask_to_move(map_, cell)
+            return reconstruct_path(parent, current)
+
         previous = current
 
         # check the neighbors
         for neighbor in possible_moves(current):
             # check that we can move there and not meet enemies
             if not can_move(map_, neighbor):
+                continue
+            if map_[neighbor.x][neighbor.y] == Entity.SHIELD and not grab_shield:
                 continue
 
             # distance from `start` to the `neighbor` through `current`
@@ -212,6 +221,9 @@ def a_star(
                 open_set.put((f_score[neighbor.x][neighbor.y], neighbor))
 
     # path from `start` to `goal` does not exist
+    if go_to_start_after_finish:
+        for cell in reconstruct_path(parent, previous)[::-1]:
+            ask_to_move(map_, cell)
     return []
 
 
@@ -223,8 +235,34 @@ def main():
     goal = Cell(x, y)
     start = Cell(0, 0)
 
-    # explore the map with A*
-    min_path = a_star(map_, start, goal, heuristics)
+    # find the shortest path from the start to the goal without grabbing the shield
+    min_path = a_star(map_, start, goal, heuristics, False, True)
+
+    # find shield if it was spotted
+    shield = Cell(-1, -1)
+    for i in range(N):
+        for j in range(N):
+            if map_[i][j] == Entity.SHIELD:
+                shield = Cell(i, j)
+
+    # if the shield was spotted
+    if shield != Cell(-1, -1):
+        # find the shortest path from the start to the shield
+        min_path_to_shield = a_star(map_, start, shield, heuristics, True, False)
+        if min_path_to_shield:
+            # remove perception zones from the map
+            # (ones for Captain Marvel will reappear during further exploration)
+            for i in range(N):
+                for j in range(N):
+                    if map_[i][j] == Entity.PERCEPTION:
+                        map_[i][j] = Entity.EMPTY
+            # find the shortest path from the shield to the goal
+            min_path_from_shield = a_star(map_, shield, goal, heuristics, False, False)
+            if min_path_from_shield:
+                # update the shortest path if neccessary
+                min_path_with_shield = min_path_to_shield[:-1] + min_path_from_shield
+                if not min_path or len(min_path_with_shield) < len(min_path):
+                    min_path = min_path_with_shield
     # print the length of the shortest path from `start` to `goal`
     # note: if path_to_goal is empty, then -1 will be printed
     print(f"e {len(min_path) - 1}")
