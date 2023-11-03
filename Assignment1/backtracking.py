@@ -227,6 +227,8 @@ def dfs_shortest(
         if not path_to_goal or len(path) < len(path_to_goal):
             if update_goal:
                 path_to_goal = path.copy()
+        # no more short paths are available
+        # because the length is equal to manhattan distance
         if len(path) - 1 == path[0].manhattan(path[-1]):
             raise NoMoreShortPaths()
     elif not path_to_goal or len(path) < len(path_to_goal) - 1:
