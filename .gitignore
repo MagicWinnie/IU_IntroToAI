@@ -1,5 +1,4 @@
-to_send/
-local_tests/
+Assignment1/local_tests/
 
 *.csv
 *.ods
