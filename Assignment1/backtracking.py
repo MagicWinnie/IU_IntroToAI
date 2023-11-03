@@ -241,7 +241,7 @@ def dfs_shortest(
             # exploit the neighbour
             dfs_shortest(map_, new_cell, goal, path, False, update_goal)
 
-    # backtracking:
+    # backtracking
     # unmark the cell, so we can visit it in the future
     visited[start.x][start.y] = False
     # remove the cell from path
