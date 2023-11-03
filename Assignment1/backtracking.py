@@ -6,6 +6,15 @@ from dataclasses import dataclass
 N = 9  # size of the map (NxN)
 
 
+class NoMoreShortPaths(Exception):
+    """
+    No more shortest paths can be found. Quick way to exit recursion
+    """
+
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
+
+
 class Entity(str, Enum):
     """
     Enum for enitites that can be found on the map:
@@ -202,8 +211,6 @@ def dfs_shortest(
         goal (Cell): Destination cell.
         path (List[Cell]): Current path.
         reset_visited (bool, optional): Whether to reset `visited` variable. Defaults to True.
-        update_goal (bool, optional): Whether to update `path_to_goal` variable. Defaults to True.
-        can_visit_shield (bool, optional): Whether can go into a cell with a shield. Defaults to True.
     """
     global path_to_goal, path_to_shield, visited
 
@@ -220,6 +227,8 @@ def dfs_shortest(
         if not path_to_goal or len(path) < len(path_to_goal):
             if update_goal:
                 path_to_goal = path.copy()
+        if len(path) - 1 == path[0].manhattan(path[-1]):
+            raise NoMoreShortPaths()
     elif not path_to_goal or len(path) < len(path_to_goal) - 1:
         # visit neighbours in such manner that we check the ones with smaller distance first
         for new_cell in sorted(possible_moves(start), key=goal.manhattan):
@@ -241,7 +250,7 @@ def dfs_shortest(
             # exploit the neighbour
             dfs_shortest(map_, new_cell, goal, path, False, update_goal)
 
-    # backtracking
+    # backtracking:
     # unmark the cell, so we can visit it in the future
     visited[start.x][start.y] = False
     # remove the cell from path
@@ -269,7 +278,10 @@ def main():
 
     # if we have reached the goal then we can find the shortest path to it (explore then exploit)
     if visited[goal.x][goal.y]:
-        dfs_shortest(without_shield_map, start, goal, [])
+        try:
+            dfs_shortest(without_shield_map, start, goal, [])
+        except NoMoreShortPaths:
+            pass
 
     # if we have found the shield in the first exploration
     if shield != Cell(-1, -1) and path_to_shield:
@@ -292,9 +304,15 @@ def main():
         # if we have reached the goal then we can find the shortest path to it (explore then exploit)
         if visited[goal.x][goal.y]:
             # first we find the shortest path to the shield
-            dfs_shortest(without_shield_map, start, shield, [], update_goal=False)
+            try:
+                dfs_shortest(without_shield_map, start, shield, [], update_goal=False)
+            except NoMoreShortPaths:
+                pass
             # then we find the shortest path from the shield to the goal
-            dfs_shortest(with_shield_map, shield, goal, path_to_shield[:-1])
+            try:
+                dfs_shortest(with_shield_map, shield, goal, path_to_shield[:-1])
+            except NoMoreShortPaths:
+                pass
     # print the length of the shortest path from `start` to `goal`
     # note: if path_to_goal is empty, then -1 will be printed
     print(f"e {len(path_to_goal) - 1}")
