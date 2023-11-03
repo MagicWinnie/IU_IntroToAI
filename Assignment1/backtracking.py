@@ -30,7 +30,7 @@ class Entity(str, Enum):
         return self.value
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Cell:
     """
     Dataclass that represents the coordinates (x, y) for a cell.
@@ -106,56 +106,6 @@ def ask_to_move(map_: List[List[Entity]], pos: Cell) -> None:
         map_[int(x)][int(y)] = Entity(e)
 
 
-def put_walls(map_: List[List[Entity]]):
-    """Put walls onto the map such that there are paths between all necessary cells.
-
-    Args:
-        map_ (List[List[Entity]]): Map.
-    """
-    for i in range(N):
-        for j in range(N):
-            # do not obstruct our way from (0, 0)
-            if i + j < 2:
-                continue
-            # we are putting walls only on the empty cells
-            if map_[i][j] != Entity.EMPTY:
-                continue
-            # check if there is some entity on north
-            if i > 0:
-                if map_[i - 1][j] not in (Entity.EMPTY, Entity.WALL):
-                    continue
-            # check if there is some entity on north-east
-            if i > 0 and j < N - 1:
-                if map_[i - 1][j + 1] not in (Entity.EMPTY, Entity.WALL):
-                    continue
-            # check if there is some entity on east
-            if j < N - 1:
-                if map_[i][j + 1] not in (Entity.EMPTY, Entity.WALL):
-                    continue
-            # check if there is some entity on south-east
-            if i < N - 1 and j < N - 1:
-                if map_[i + 1][j + 1] not in (Entity.EMPTY, Entity.WALL):
-                    continue
-            # check if there is some entity on south
-            if i < N - 1:
-                if map_[i + 1][j] not in (Entity.EMPTY, Entity.WALL):
-                    continue
-            # check if there is some entity on south-west
-            if i < N - 1 and j > 0:
-                if map_[i + 1][j - 1] not in (Entity.EMPTY, Entity.WALL):
-                    continue
-            # check if there is some entity on west
-            if j > 0:
-                if map_[i][j - 1] not in (Entity.EMPTY, Entity.WALL):
-                    continue
-            # check if there is some entity on north-west
-            if i > 0 and j > 0:
-                if map_[i - 1][j - 1] not in (Entity.EMPTY, Entity.WALL):
-                    continue
-            # if the cell is surrounding by EMPTY or WALL cells then we can put a WALL
-            map_[i][j] = Entity.WALL
-
-
 path_to_goal: List[Cell] = []  # contains the shortest path to our goal (infinity stone)
 path_to_shield: List[Cell] = []  # contains the shortest path to the shield
 visited = [[False for _ in range(N)] for _ in range(N)]  # keeping track of visited cells
@@ -165,7 +115,7 @@ def dfs(
     map_: List[List[Entity]],
     start: Cell,
     goal: Cell,
-    path: List[Cell] = [],
+    path: List[Cell],
     reset_visited: bool = True,
 ) -> None:
     """Explores recursively the `map_` using the interactor.
@@ -182,7 +132,7 @@ def dfs(
         map_ (List[List[Entity]]): Map.
         start (Cell): Source cell.
         goal (Cell): Destination cell.
-        path (List[Cell], optional): Current path. Defaults to [].
+        path (List[Cell]): Current path.
         reset_visited (bool, optional): Whether to reset `visited` variable. Defaults to True.
     """
     global path_to_goal, path_to_shield, visited
@@ -204,7 +154,7 @@ def dfs(
         return
 
     # move into neighbouring cells
-    for new_cell in possible_moves(start):
+    for new_cell in sorted(possible_moves(start), key=goal.manhattan):
         # check that we did not visit it
         if visited[new_cell.x][new_cell.y]:
             continue
@@ -233,8 +183,10 @@ def dfs_shortest(
     map_: List[List[Entity]],
     start: Cell,
     goal: Cell,
-    path: List[Cell] = [],
+    path: List[Cell],
     reset_visited: bool = True,
+    update_goal: bool = True,
+    can_visit_shield: bool = True,
 ) -> None:
     """Traverses recursively the `map_` without using the interactor.
 
@@ -248,8 +200,10 @@ def dfs_shortest(
         map_ (List[List[Entity]]): Map.
         start (Cell): Source cell.
         goal (Cell): Destination cell.
-        path (List[Cell], optional): Current path. Defaults to [].
+        path (List[Cell]): Current path.
         reset_visited (bool, optional): Whether to reset `visited` variable. Defaults to True.
+        update_goal (bool, optional): Whether to update `path_to_goal` variable. Defaults to True.
+        can_visit_shield (bool, optional): Whether can go into a cell with a shield. Defaults to True.
     """
     global path_to_goal, path_to_shield, visited
 
@@ -264,8 +218,9 @@ def dfs_shortest(
     # when we reach our destination we can update the path to it and continue the exploitation
     if start == goal:
         if not path_to_goal or len(path) < len(path_to_goal):
-            path_to_goal = path.copy()
-    elif not path_to_goal or len(path) < len(path_to_goal):
+            if update_goal:
+                path_to_goal = path.copy()
+    elif not path_to_goal or len(path) < len(path_to_goal) - 1:
         # visit neighbours in such manner that we check the ones with smaller distance first
         for new_cell in sorted(possible_moves(start), key=goal.manhattan):
             # check that we did not visit it
@@ -280,10 +235,11 @@ def dfs_shortest(
                 if not path_to_shield or len(path) + 1 < len(path_to_shield):
                     path_to_shield = path.copy() + [new_cell]
                 # do not grab it
-                continue
+                if not can_visit_shield:
+                    continue
 
             # exploit the neighbour
-            dfs_shortest(map_, new_cell, goal, path, False)
+            dfs_shortest(map_, new_cell, goal, path, False, update_goal)
 
     # backtracking:
     # unmark the cell, so we can visit it in the future
@@ -293,7 +249,7 @@ def dfs_shortest(
 
 
 def main():
-    global path_to_goal
+    global path_to_goal, path_to_shield
 
     variant_number = int(input())
     x, y = map(int, input().split())
@@ -303,7 +259,7 @@ def main():
 
     # first we explore the map from start without picking up the shield
     without_shield_map = [[Entity.EMPTY for _ in range(N)] for _ in range(N)]
-    dfs(without_shield_map, start, goal)
+    dfs(without_shield_map, start, goal, [])
 
     # find the location if the shield if found
     for i in range(N):
@@ -313,7 +269,8 @@ def main():
 
     # if we have reached the goal then we can find the shortest path to it (explore then exploit)
     if visited[goal.x][goal.y]:
-        dfs_shortest(without_shield_map, start, goal)
+        dfs_shortest(without_shield_map, start, goal, [])
+
     # if we have found the shield in the first exploration
     if shield != Cell(-1, -1) and path_to_shield:
         with_shield_map = [x[:] for x in without_shield_map]
@@ -330,16 +287,12 @@ def main():
                     with_shield_map[i][j] = Entity.EMPTY
 
         # explore the map with the shield from its location
-        dfs(with_shield_map, shield, goal)
+        dfs(with_shield_map, shield, goal, path_to_shield[:-1])
 
         # if we have reached the goal then we can find the shortest path to it (explore then exploit)
         if visited[goal.x][goal.y]:
-            # put walls in empty cells not surrounded by characters
-            # this way we reduce our map to a maze where paths have width of only 1 cell
-            # therefore, much reducing the amount of processed paths
-            put_walls(with_shield_map)
             # first we find the shortest path to the shield
-            dfs_shortest(with_shield_map, start, shield)
+            dfs_shortest(without_shield_map, start, shield, [], update_goal=False)
             # then we find the shortest path from the shield to the goal
             dfs_shortest(with_shield_map, shield, goal, path_to_shield[:-1])
     # print the length of the shortest path from `start` to `goal`
