@@ -25,9 +25,9 @@ print("\tA* V2:", max(times_a_star_2))
 print("\tB V1:", max(times_backtracking_1))
 print("\tB V2:", max(times_backtracking_2))
 
-for t in times_backtracking_1:
-    if t >= 3:
-        print(t)
+for test, time in zip(tests, times_backtracking_1):
+    if time >= 3:
+        print(test, time)
 
 print("A* variant 1:")
 for t, a in zip(tests, answers_a_star_1):
