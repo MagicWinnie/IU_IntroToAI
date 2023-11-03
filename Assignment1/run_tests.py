@@ -63,11 +63,20 @@ def illegal_move(msg, curr, future):
     print("-" * DASH_LENGTH)
 
 
-def get_order(file: str):
+def get_order(file):
     match = FILE_PATTERN.match(os.path.splitext(os.path.basename(file))[0])
     if not match:
         return float("inf")
     return int(match.groups()[0])
+
+
+def kill(process):
+    if os.name == "nt":  # Windows
+        subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=process.pid))
+    else:
+        import signal
+
+        os.kill(process.pid, signal.SIGTERM)
 
 
 def parse_args() -> Namespace:
@@ -106,105 +115,112 @@ def parse_args() -> Namespace:
 def main():
     args = parse_args()
 
-    fp = open(args.output, "w")
-    fp.write("TEST,ANSWER,TIME\n")
-
     if os.path.isdir(args.tests):
         tests = glob.glob(os.path.join(args.tests, "*.txt"))
     else:
         tests = [args.tests]
-    for test in sorted(tests, key=get_order):
-        print("-" * (DASH_LENGTH // 2) + test + "-" * (DASH_LENGTH // 2))
 
-        map_ = [["." for _ in range(N)] for _ in range(N)]
-        infinity_stone = (-1, -1)
-        captain_marvel = (-1, -1)
-        with open(test, "r") as test_fp:
-            for i, line in enumerate(test_fp):
-                for j, entity in enumerate(line.split()):
-                    if entity == "I":
-                        infinity_stone = (i, j)
-                    elif entity == "M":
-                        captain_marvel = (i, j)
-                    map_[i][j] = entity
-                print(" ".join(map_[i]))
+    with open(args.output, "w") as fp:
+        fp.write("TEST,ANSWER,TIME\n")
 
-        prev_cell = (0, 0)
-        variant_number = args.variant if args.variant in (1, 2) else randint(1, 2)
+        for test in sorted(tests, key=get_order):
+            print("-" * (DASH_LENGTH // 2) + test + "-" * (DASH_LENGTH // 2))
 
-        print("Variant number:", variant_number)
+            map_ = [["." for _ in range(N)] for _ in range(N)]
+            infinity_stone = (-1, -1)
+            captain_marvel = (-1, -1)
+            with open(test, "r") as test_fp:
+                for i, line in enumerate(test_fp):
+                    for j, entity in enumerate(line.split()):
+                        if entity == "I":
+                            infinity_stone = (i, j)
+                        elif entity == "M":
+                            captain_marvel = (i, j)
+                        map_[i][j] = entity
+                    print(" ".join(map_[i]))
 
-        proc = subprocess.Popen(
-            args.cmd,
-            shell=True,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        if not proc.stdin or not proc.stdout or not proc.stderr:
-            print("[ERROR] stdin, stdout, or stderr in subprocess.Popen is not assigned to subprocess.PIPE")
-            fp.close()
-            exit(1)
+            prev_cell = (0, 0)
+            variant_number = args.variant if args.variant in (1, 2) else randint(1, 2)
 
-        start_time = time.time()
+            print("Variant number:", variant_number)
 
-        proc.stdin.write(f"{variant_number}\n".encode("ASCII"))
-        proc.stdin.write(f"{infinity_stone[0]} {infinity_stone[1]}\n".encode("ASCII"))
-        proc.stdin.flush()
-
-        while True:
-            output = proc.stdout.readline().decode("ASCII").strip()
-            if not output:
-                print("[ERROR] An exception was raised while running:")
-                print("-" * DASH_LENGTH)
-                for line in proc.stderr.readlines():
-                    print(line.decode("ASCII").rstrip())
-                print("-" * DASH_LENGTH)
-                fp.close()
+            proc = subprocess.Popen(
+                args.cmd.split(),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            if not proc.stdin or not proc.stdout or not proc.stderr:
+                print("[ERROR] stdin, stdout, or stderr in subprocess.Popen is not assigned to subprocess.PIPE")
+                kill(proc)
                 exit(1)
-            elif output[0] == "m":
-                _, x, y = output.split()
-                move_cell = (int(x), int(y))
-                if m_dist(move_cell, prev_cell) > 1:
-                    illegal_move("Can't teleport", prev_cell, move_cell)
-                    fp.close()
-                    exit(1)
-                elif map_[move_cell[0]][move_cell[1]] in ("M", "H", "T"):
-                    illegal_move("Can't move into a cell with Avengers", prev_cell, move_cell)
-                    fp.close()
-                    exit(1)
-                elif map_[move_cell[0]][move_cell[1]] == "P":
-                    illegal_move("Can't move into perception zone of Avengers", prev_cell, move_cell)
-                    fp.close()
-                    exit(1)
-                else:
-                    prev_cell = move_cell
-                if map_[move_cell[0]][move_cell[1]] == "S":
-                    for i in range(N):
-                        for j in range(N):
-                            if map_[i][j] == "P":
-                                map_[i][j] = "."
-                    for i in range(N):
-                        for j in range(N):
-                            if map_[i][j] != ".":
-                                continue
-                            if vonneumann_perception_zone((i, j), captain_marvel, 2):
-                                map_[i][j] = "P"
 
-                surroundings = get_surroundings(map_, variant_number, move_cell)
-                proc.stdin.write(f"{len(surroundings)}\n".encode("ASCII"))
-                for cell, entity in surroundings:
-                    proc.stdin.write(f"{cell[0]} {cell[1]} {entity}\n".encode("ASCII"))
-                proc.stdin.flush()
-            elif output[0] == "e":
-                print("Output:", output)
-                end_time = time.time()
-                fp.write(f"{test},{output.split()[1]},{end_time - start_time}\n")
-                break
+            start_time = time.time()
 
-        print("-" * (DASH_LENGTH + len(test)))
+            proc.stdin.write(f"{variant_number}\n".encode("ASCII"))
+            proc.stdin.write(f"{infinity_stone[0]} {infinity_stone[1]}\n".encode("ASCII"))
+            proc.stdin.flush()
 
-    fp.close()
+            while True:
+                try:
+                    output = proc.stdout.readline().decode("ASCII").strip()
+                    if not output:
+                        print("[ERROR] An exception was raised while running:")
+                        print("-" * DASH_LENGTH)
+                        for line in proc.stderr.readlines():
+                            print(line.decode("ASCII").rstrip())
+                        print("-" * DASH_LENGTH)
+
+                        kill(proc)
+                        exit(1)
+                    elif output[0] == "m":
+                        _, x, y = output.split()
+                        move_cell = (int(x), int(y))
+                        if m_dist(move_cell, prev_cell) > 1:
+                            illegal_move("Can't teleport", prev_cell, move_cell)
+
+                            kill(proc)
+                            exit(1)
+                        elif map_[move_cell[0]][move_cell[1]] in ("M", "H", "T"):
+                            illegal_move("Can't move into a cell with Avengers", prev_cell, move_cell)
+
+                            kill(proc)
+                            exit(1)
+                        elif map_[move_cell[0]][move_cell[1]] == "P":
+                            illegal_move("Can't move into perception zone of Avengers", prev_cell, move_cell)
+
+                            kill(proc)
+                            exit(1)
+                        else:
+                            prev_cell = move_cell
+                        if map_[move_cell[0]][move_cell[1]] == "S":
+                            for i in range(N):
+                                for j in range(N):
+                                    if map_[i][j] == "P":
+                                        map_[i][j] = "."
+                            for i in range(N):
+                                for j in range(N):
+                                    if map_[i][j] != ".":
+                                        continue
+                                    if vonneumann_perception_zone((i, j), captain_marvel, 2):
+                                        map_[i][j] = "P"
+
+                        surroundings = get_surroundings(map_, variant_number, move_cell)
+                        proc.stdin.write(f"{len(surroundings)}\n".encode("ASCII"))
+                        for cell, entity in surroundings:
+                            proc.stdin.write(f"{cell[0]} {cell[1]} {entity}\n".encode("ASCII"))
+                        proc.stdin.flush()
+                    elif output[0] == "e":
+                        print("Output:", output)
+                        end_time = time.time()
+                        kill(proc)
+                        fp.write(f"{test},{output.split()[1]},{end_time - start_time}\n")
+                        break
+                except KeyboardInterrupt:
+                    kill(proc)
+                    exit(1)
+
+            print("-" * (DASH_LENGTH + len(test)))
 
 
 if __name__ == "__main__":
