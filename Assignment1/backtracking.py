@@ -15,11 +15,11 @@ class NoMoreShortPaths(Exception):
         super().__init__(*args)
 
 
-class Entity(str, Enum):
+class Character(str, Enum):
     """
-    Enum for enitites that can be found on the map:
+    Enum for characters that can be found on the map:
         Hulk, Thor, Captain Marvel, Infinity Stone, Shield, and Perception Zone.
-    Note: EMPTY, WALL, and PATH are technical entities.
+    Note: EMPTY, and PATH are technical entities.
     """
 
     HULK = "H"
@@ -30,7 +30,6 @@ class Entity(str, Enum):
     PERCEPTION = "P"
     EMPTY = "."
     PATH = "*"
-    WALL = "W"
 
     def __str__(self):
         return self.value
@@ -39,7 +38,7 @@ class Entity(str, Enum):
         return self.value
 
 
-@dataclass(unsafe_hash=True)
+@dataclass
 class Cell:
     """
     Dataclass that represents the coordinates (x, y) for a cell.
@@ -63,32 +62,8 @@ class Cell:
         return abs(self.x - other.x) + abs(self.y - other.y)
 
 
-def possible_moves(pos: Cell) -> List[Cell]:
-    """Returns a list of possible moves from `pos` cell.
-    Note: it checks only for out of bounds and does not check for obstacles.
-
-    Args:
-        pos (Cell): Cell to start from.
-
-    Returns:
-        List[Cell]: Possible moves from `pos`.
-    """
-    moves: List[Cell] = []
-    # we can move up, down, left, right
-    if pos.x > 0:
-        moves.append(pos + Cell(-1, 0))
-    if pos.x < N - 1:
-        moves.append(pos + Cell(1, 0))
-    if pos.y > 0:
-        moves.append(pos + Cell(0, -1))
-    if pos.y < N - 1:
-        moves.append(pos + Cell(0, 1))
-    return moves
-
-
-def can_move(map_: List[List[Entity]], pos: Cell) -> bool:
+def can_move(map_: List[List[Character]], pos: Cell) -> bool:
     """Returns whether one can move into `pos`.
-    Note: it checks only for obstacles and does not check for out of bounds.
 
     Args:
         map_ (List[List[Entity]]): Map.
@@ -98,10 +73,12 @@ def can_move(map_: List[List[Entity]], pos: Cell) -> bool:
         bool: Whether one can move into `pos`.
     """
     # we can move into a cell which does not contain obstacles
-    return map_[pos.x][pos.y] not in (Entity.CAPTAIN_MARVEL, Entity.HULK, Entity.THOR, Entity.PERCEPTION, Entity.WALL)
+    if pos.x < 0 or pos.y < 0 or pos.x >= N or pos.y >= N:
+        return False
+    return map_[pos.x][pos.y] not in (Character.CAPTAIN_MARVEL, Character.HULK, Character.THOR, Character.PERCEPTION)
 
 
-def ask_to_move(map_: List[List[Entity]], pos: Cell) -> None:
+def ask_to_move(map_: List[List[Character]], pos: Cell) -> None:
     """Ask the interactor to move into `pos` and gather information about surroundings.
 
     Args:
@@ -112,7 +89,7 @@ def ask_to_move(map_: List[List[Entity]], pos: Cell) -> None:
     n = int(input())
     for _ in range(n):
         x, y, e = input().split()
-        map_[int(x)][int(y)] = Entity(e)
+        map_[int(x)][int(y)] = Character(e)
 
 
 path_to_goal: List[Cell] = []  # contains the shortest path to our goal (infinity stone)
@@ -121,7 +98,7 @@ visited = [[False for _ in range(N)] for _ in range(N)]  # keeping track of visi
 
 
 def dfs(
-    map_: List[List[Entity]],
+    map_: List[List[Character]],
     start: Cell,
     goal: Cell,
     path: List[Cell],
@@ -163,15 +140,16 @@ def dfs(
         return
 
     # move into neighbouring cells
-    for new_cell in sorted(possible_moves(start), key=goal.manhattan):
-        # check that we did not visit it
-        if visited[new_cell.x][new_cell.y]:
-            continue
+    moves = [start + direction for direction in (Cell(1, 0), Cell(0, 1), Cell(-1, 0), Cell(0, -1))]
+    for new_cell in sorted(moves, key=goal.manhattan):
         # check that we can move there and not meet enemies
         if not can_move(map_, new_cell):
             continue
+        # check that we did not visit it
+        if visited[new_cell.x][new_cell.y]:
+            continue
         # if we encounter a shield
-        if map_[new_cell.x][new_cell.y] == Entity.SHIELD:
+        if map_[new_cell.x][new_cell.y] == Character.SHIELD:
             # update the path to it
             if not path_to_shield or len(path) + 1 < len(path_to_shield):
                 path_to_shield = path.copy() + [new_cell]
@@ -189,7 +167,7 @@ def dfs(
 
 
 def dfs_shortest(
-    map_: List[List[Entity]],
+    map_: List[List[Character]],
     start: Cell,
     goal: Cell,
     path: List[Cell],
@@ -233,15 +211,16 @@ def dfs_shortest(
             raise NoMoreShortPaths()
     elif not path_to_goal or len(path) < len(path_to_goal) - 1:
         # visit neighbours in such manner that we check the ones with smaller distance first
-        for new_cell in sorted(possible_moves(start), key=goal.manhattan):
-            # check that we did not visit it
-            if visited[new_cell.x][new_cell.y]:
-                continue
+        moves = [start + direction for direction in (Cell(1, 0), Cell(0, 1), Cell(-1, 0), Cell(0, -1))]
+        for new_cell in sorted(moves, key=goal.manhattan):
             # check that we can move there and not meet enemies
             if not can_move(map_, new_cell):
                 continue
+            # check that we did not visit it
+            if visited[new_cell.x][new_cell.y]:
+                continue
             # if we encounter a shield
-            if map_[new_cell.x][new_cell.y] == Entity.SHIELD:
+            if map_[new_cell.x][new_cell.y] == Character.SHIELD:
                 # update the path to it
                 if not path_to_shield or len(path) + 1 < len(path_to_shield):
                     path_to_shield = path.copy() + [new_cell]
@@ -269,13 +248,13 @@ def main():
     shield = Cell(-1, -1)
 
     # first we explore the map from start without picking up the shield
-    without_shield_map = [[Entity.EMPTY for _ in range(N)] for _ in range(N)]
+    without_shield_map = [[Character.EMPTY for _ in range(N)] for _ in range(N)]
     dfs(without_shield_map, start, goal, [])
 
     # find the location if the shield if found
     for i in range(N):
         for j in range(N):
-            if without_shield_map[i][j] == Entity.SHIELD:
+            if without_shield_map[i][j] == Character.SHIELD:
                 shield = Cell(i, j)
 
     # if we have reached the goal then we can find the shortest path to it (explore then exploit)
@@ -297,8 +276,8 @@ def main():
         # perception zone for Captain Marvel will reappear as we use the interactor
         for i in range(N):
             for j in range(N):
-                if with_shield_map[i][j] == Entity.PERCEPTION:
-                    with_shield_map[i][j] = Entity.EMPTY
+                if with_shield_map[i][j] == Character.PERCEPTION:
+                    with_shield_map[i][j] = Character.EMPTY
 
         # explore the map with the shield from its location
         dfs(with_shield_map, shield, goal, path_to_shield[:-1])
