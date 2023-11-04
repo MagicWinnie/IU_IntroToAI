@@ -1,15 +1,15 @@
-from typing import List, Dict, Callable
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
+from typing import Callable, Dict, List, Tuple
 from queue import PriorityQueue
 
 
 N = 9  # size of the map (NxN)
 
 
-class Entity(str, Enum):
+class Character(str, Enum):
     """
-    Enum for enitites that can be found on the map:
+    Enum for characters that can be found on the map:
         Hulk, Thor, Captain Marvel, Infinity Stone, Shield, and Perception Zone.
     Note: EMPTY and PATH are technical entities.
     """
@@ -54,30 +54,7 @@ class Cell:
         return abs(self.x - other.x) + abs(self.y - other.y)
 
 
-def possible_moves(pos: Cell) -> List[Cell]:
-    """Returns a list of possible moves from `pos` cell.
-    Note: it checks only for out of bounds and does not check for obstacles.
-
-    Args:
-        pos (Cell): Cell to start from.
-
-    Returns:
-        List[Cell]: Possible moves from `pos`.
-    """
-    moves: List[Cell] = []
-    # we can move up, down, left, right
-    if pos.x > 0:
-        moves.append(pos + Cell(-1, 0))
-    if pos.x < N - 1:
-        moves.append(pos + Cell(1, 0))
-    if pos.y > 0:
-        moves.append(pos + Cell(0, -1))
-    if pos.y < N - 1:
-        moves.append(pos + Cell(0, 1))
-    return moves
-
-
-def can_move(map_: List[List[Entity]], pos: Cell) -> bool:
+def can_move(map_: List[List[Character]], pos: Cell) -> bool:
     """Returns whether one can move into `pos`.
     Note: it checks only for obstacles and does not check for out of bounds.
 
@@ -89,10 +66,12 @@ def can_move(map_: List[List[Entity]], pos: Cell) -> bool:
         bool: Whether one can move into `pos`.
     """
     # we can move into a cell which does not contain obstacles
-    return map_[pos.x][pos.y] not in (Entity.CAPTAIN_MARVEL, Entity.HULK, Entity.THOR, Entity.PERCEPTION)
+    if pos.x < 0 or pos.y < 0 or pos.x >= N or pos.y >= N:
+        return False
+    return map_[pos.x][pos.y] not in (Character.CAPTAIN_MARVEL, Character.HULK, Character.THOR, Character.PERCEPTION)
 
 
-def ask_to_move(map_: List[List[Entity]], pos: Cell) -> None:
+def ask_to_move(map_: List[List[Character]], pos: Cell) -> None:
     """Ask the interactor to move into `pos` and gather information about surroundings.
 
     Args:
@@ -103,7 +82,7 @@ def ask_to_move(map_: List[List[Entity]], pos: Cell) -> None:
     n = int(input())
     for _ in range(n):
         x, y, e = input().split()
-        map_[int(x)][int(y)] = Entity(e)
+        map_[int(x)][int(y)] = Character(e)
 
 
 def heuristics(start: Cell, goal: Cell) -> float:
@@ -119,7 +98,7 @@ def heuristics(start: Cell, goal: Cell) -> float:
     return start.manhattan(goal)
 
 
-def reconstruct_path(parent: Dict[Cell, Cell], current: Cell) -> List[Cell]:
+def path_from_parents(parent: Dict[Cell, Cell], current: Cell) -> List[Cell]:
     """Reconstructs the path based on `parent` dictionary and the `goal` cell.
 
     Args:
@@ -137,7 +116,7 @@ def reconstruct_path(parent: Dict[Cell, Cell], current: Cell) -> List[Cell]:
 
 
 def a_star(
-    map_: List[List[Entity]],
+    map_: List[List[Character]],
     start: Cell,
     goal: Cell,
     h: Callable[[Cell, Cell], float],
@@ -159,7 +138,7 @@ def a_star(
         List[Cell]: Shortest path from `start` to `goal` (empty list if not found)
     """
     # set of discovered cells that may need to be (re-)expanded
-    open_set = PriorityQueue()
+    open_set: PriorityQueue[Tuple[float, Cell]] = PriorityQueue()
     open_set.put((0, start))
 
     # parent dictionary (stores the closest parent)
@@ -182,10 +161,10 @@ def a_star(
         # move the interactor from the previous cell to the current one to prevent teleportation
         if current.manhattan(previous) != 1:
             # move through cells from `previous` to `start`
-            for cell in reconstruct_path(parent, previous)[::-1]:
+            for cell in path_from_parents(parent, previous)[::-1]:
                 ask_to_move(map_, cell)
             # move through cells from `start` to preceding of current
-            for cell in reconstruct_path(parent, current)[1:]:
+            for cell in path_from_parents(parent, current)[1:]:
                 ask_to_move(map_, cell)
         # move to the current cell
         ask_to_move(map_, current)
@@ -193,18 +172,19 @@ def a_star(
         # when we reach the destination we can reconstruct the path
         if current == goal:
             if go_to_start_after_finish:
-                for cell in reconstruct_path(parent, current)[::-1]:
+                for cell in path_from_parents(parent, current)[::-1]:
                     ask_to_move(map_, cell)
-            return reconstruct_path(parent, current)
+            return path_from_parents(parent, current)
 
         previous = current
 
         # check the neighbors
-        for neighbor in possible_moves(current):
+        for direction in Cell(1, 0), Cell(0, 1), Cell(-1, 0), Cell(0, -1):
+            neighbor = current + direction
             # check that we can move there and not meet enemies
             if not can_move(map_, neighbor):
                 continue
-            if map_[neighbor.x][neighbor.y] == Entity.SHIELD and not grab_shield:
+            if map_[neighbor.x][neighbor.y] == Character.SHIELD and not grab_shield:
                 continue
 
             # distance from `start` to the `neighbor` through `current`
@@ -222,13 +202,13 @@ def a_star(
 
     # path from `start` to `goal` does not exist
     if go_to_start_after_finish:
-        for cell in reconstruct_path(parent, previous)[::-1]:
+        for cell in path_from_parents(parent, previous)[::-1]:
             ask_to_move(map_, cell)
     return []
 
 
 def main():
-    map_: List[List[Entity]] = [[Entity.EMPTY for _ in range(N)] for _ in range(N)]
+    map_: List[List[Character]] = [[Character.EMPTY for _ in range(N)] for _ in range(N)]
 
     variant_number = int(input())
     x, y = map(int, input().split())
@@ -242,7 +222,7 @@ def main():
     shield = Cell(-1, -1)
     for i in range(N):
         for j in range(N):
-            if map_[i][j] == Entity.SHIELD:
+            if map_[i][j] == Character.SHIELD:
                 shield = Cell(i, j)
 
     # if the shield was spotted
@@ -254,8 +234,8 @@ def main():
             # (ones for Captain Marvel will reappear during further exploration)
             for i in range(N):
                 for j in range(N):
-                    if map_[i][j] == Entity.PERCEPTION:
-                        map_[i][j] = Entity.EMPTY
+                    if map_[i][j] == Character.PERCEPTION:
+                        map_[i][j] = Character.EMPTY
             # find the shortest path from the shield to the goal
             min_path_from_shield = a_star(map_, shield, goal, heuristics, False, False)
             if min_path_from_shield:
