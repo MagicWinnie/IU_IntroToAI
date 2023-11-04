@@ -49,9 +49,26 @@
 \newpage
 
 \section{Algorithm flow}
+The general idea for both of my algorithms is following:
+\begin{enumerate}
+    \item Explore the map without picking up the Shield
+    \item Explore the map going through the cell with the Shield
+    \item Compare the two distances and choose the shortest
+\end{enumerate}
 \subsection{Backtracking search}
+For backtracking I have used Depth-First Search (described on the lecture). Two versions of DFS were used: for exploration and for exploitation.
+The former uses the interactor and the latter does not use the interactor. Exploration DFS finds the first path to the goal and exploitation DFS finds the shortest path.
+Latter has optimizations for length of the current path and to exit the recursion if no short paths were found.
+All the information about the characters is stored in a map.
+
+I start of by using the exploration DFS to put the characters onto the map and find out whether it is possible to reach the goal without the Shield.
+If the Stone was reached, then using the exploitation DFS I find the shortest path to it.
+After that I check whether the Shield was found and its cell could be reached. If so, I move to the cell with the Shield and explore the map with it. 
+If the Stone was reached, then using the exploitation DFS I find the shortest path to the Shield and to the Stone from it.
+Finally, I find the shortest path among the two.
 
 \subsection{A* search}
+
 
 \section{Statistical comparison}
 For generating maps and running the solutions on them, a generator and an interactor scripts were written by me and tested by Matvey Korinenko. Note that these scripts were shared with other students. They can be found in the following Github Gist: \url{https://gist.github.com/MagicWinnie/d8899001c41c851bdc1ae9a10def8fb4}
@@ -103,9 +120,9 @@ Also it is interesting to look at the standard deviations: it is much larger for
 It, basically, repeats the information given in subsection \ref{backtracking_1_vs_a_star_1}.
 \subsection{Backtracking (variant 1) compared to Backtracking (variant 2)} \label{backtracking_1_vs_backtracking_2}
 Mean, mode, and median times for variant 2 are a little bit higher compared to variant 1. This is possibly due to more information being read from the interactor and writing it to the map.
-Standard deviation for variant 2 is a little bit smaller and, currently, I do not know why this happened.
+Standard deviation for variant 2 is a little bit smaller and, currently, I do not know why this has happened.
 \subsection{A* (variant 1) compared to A* (variant 2)}
-It is, basically, the same as in subsection \ref{backtracking_1_vs_backtracking_2}: variant 2 is little bit slower compared to variant 1. However, the standard deviation for variant 2 is a little bit higher than in variant 1.
+It is, basically, the same as in subsection \ref{backtracking_1_vs_backtracking_2}: variant 2 is a little bit slower compared to variant 1. However, the standard deviation for variant 2 is a little bit higher than in variant 1.
 \section{PEAS description}
 \subsection{Performance Measure}
 The performance measure for Thanos would be reaching the Infinity Stone in the fastest way possible.
@@ -118,7 +135,7 @@ The environment for Thanos would be our map.
 
 \textbf{Deterministic.} The next state of the map can be determined given the previous state and the action applying.
 
-\textbf{Sequential.} Current decisions in our map can have consequences on future actions: picking up the shield removes the perception zones of Hulk and Thor.
+\textbf{Sequential.} Current decisions in our map can have consequences on future actions: picking up the Shield removes the perception zones of Hulk and Thor.
 
 \textbf{Static.} When Thanos is staying still and is thinking about his actions, the environment does not change.
 
