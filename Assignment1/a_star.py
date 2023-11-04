@@ -56,7 +56,6 @@ class Cell:
 
 def can_move(map_: List[List[Character]], pos: Cell) -> bool:
     """Returns whether one can move into `pos`.
-    Note: it checks only for obstacles and does not check for out of bounds.
 
     Args:
         map_ (List[List[Entity]]): Map.
