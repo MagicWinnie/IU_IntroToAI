@@ -66,9 +66,12 @@ If the Stone was reached, then using the exploitation DFS I find the shortest pa
 After that I check whether the Shield was found and its cell could be reached. If so, I move to the cell with the Shield and explore the map with it. 
 If the Stone was reached, then using the exploitation DFS I find the shortest path to the Shield and to the Stone from it.
 Finally, I find the shortest path among the two.
-
 \subsection{A* search}
+For A* I have used the algorithm described in Wikipedia (\url{https://en.wikipedia.org/wiki/A*_search_algorithm#Pseudocode}). The only change in the algorithm was to prevent teleportation: for each step I move back the interactor to the start and move from there to the new cell.
+All the information about the characters is stored in a map.
 
+I start of by running A* to the Stone. If the Shield was found and can be reached then I run A* to the Shield and from it to the goal.
+Finally, I find the shortest path among the two.
 
 \section{Statistical comparison}
 For generating maps and running the solutions on them, a generator and an interactor scripts were written by me and tested by Matvey Korinenko. Note that these scripts were shared with other students. They can be found in the following Github Gist: \url{https://gist.github.com/MagicWinnie/d8899001c41c851bdc1ae9a10def8fb4}
