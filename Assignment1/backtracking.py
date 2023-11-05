@@ -1,18 +1,9 @@
-from typing import List
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
+from typing import List
 
 
 N = 9  # size of the map (NxN)
-
-
-class NoMoreShortPaths(Exception):
-    """
-    No more shortest paths can be found. Quick way to exit recursion
-    """
-
-    def __init__(self, *args: object) -> None:
-        super().__init__(*args)
 
 
 class Character(str, Enum):
@@ -62,7 +53,11 @@ class Cell:
         return abs(self.x - other.x) + abs(self.y - other.y)
 
 
-def can_move(map_: List[List[Character]], pos: Cell) -> bool:
+def move_in_map(pos: Cell) -> bool:
+    return 0 <= pos.x < N and 0 <= pos.y < N
+
+
+def move_is_empty(map_: List[List[Character]], pos: Cell) -> bool:
     """Returns whether one can move into `pos`.
 
     Args:
@@ -73,9 +68,7 @@ def can_move(map_: List[List[Character]], pos: Cell) -> bool:
         bool: Whether one can move into `pos`.
     """
     # we can move into a cell which does not contain obstacles
-    if pos.x < 0 or pos.y < 0 or pos.x >= N or pos.y >= N:
-        return False
-    return map_[pos.x][pos.y] not in (Character.CAPTAIN_MARVEL, Character.HULK, Character.THOR, Character.PERCEPTION)
+    return map_[pos.x][pos.y] in (Character.EMPTY, Character.INFINITY_STONE)
 
 
 def ask_to_move(map_: List[List[Character]], pos: Cell) -> None:
@@ -92,210 +85,101 @@ def ask_to_move(map_: List[List[Character]], pos: Cell) -> None:
         map_[int(x)][int(y)] = Character(e)
 
 
-path_to_goal: List[Cell] = []  # contains the shortest path to our goal (infinity stone)
-path_to_shield: List[Cell] = []  # contains the shortest path to the shield
-visited = [[False for _ in range(N)] for _ in range(N)]  # keeping track of visited cells
+def get_accessible_neighbours(pos: Cell) -> List[Cell]:
+    neighbours = []
+    for direction in Cell(1, 0), Cell(0, 1), Cell(-1, 0), Cell(0, -1):
+        neighbour = pos + direction
+        if move_in_map(neighbour):
+            neighbours.append(neighbour)
+    return neighbours
 
 
-def dfs(
+def get_accessible_perception(pos: Cell, variant: int) -> List[Cell]:
+    perception = (Cell(1, 0), Cell(1, 1), Cell(0, 1), Cell(-1, 1), Cell(-1, 0), Cell(-1, -1), Cell(0, -1), Cell(1, -1))
+    if variant == 2:
+        perception += (Cell(2, 2), Cell(-2, 2), Cell(-2, -2), Cell(2, -2))
+
+    neighbours = []
+    for direction in perception:
+        neighbour = pos + direction
+        if move_in_map(neighbour):
+            neighbours.append(neighbour)
+
+    return neighbours
+
+
+visited: List[List[bool]] = [[False for _ in range(N)] for _ in range(N)]
+distance: List[List[int]] = [[N**3 for _ in range(N)] for _ in range(N)]
+path_to_goal: List[Cell] = []
+path_to_shield: List[Cell] = []
+
+
+def backtracking(
     map_: List[List[Character]],
-    start: Cell,
+    current: Cell,
     goal: Cell,
     path: List[Cell],
-    reset_visited: bool = True,
+    variant_number: int,
 ) -> None:
-    """Explores recursively the `map_` using the interactor.
+    global path_to_goal, path_to_shield, visited, distance
 
-    Stores the first found path to `goal` in global variable `path_to_goal`
-    (if it is shorter than the current value of `path_to_goal`).
-
-    Stores the first found path to the shield in global variable `path_to_shield`.
-    (if it is shorter than the current value of `path_to_shield`).
-
-    Keeps track of visited cells in global variable `visited`.
-
-    Args:
-        map_ (List[List[Entity]]): Map.
-        start (Cell): Source cell.
-        goal (Cell): Destination cell.
-        path (List[Cell]): Current path.
-        reset_visited (bool, optional): Whether to reset `visited` variable. Defaults to True.
-    """
-    global path_to_goal, path_to_shield, visited
-
-    if reset_visited:
-        visited = [[False for _ in range(N)] for _ in range(N)]
-
-    # visit a new cell
-    visited[start.x][start.y] = True
-    # add it to our current path
-    path.append(start)
-    # ask the interactor about the surroundings
-    ask_to_move(map_, start)
-
-    # when we reach our destination we can update the path to it and exit the exploration
-    if start == goal:
-        if not path_to_goal or len(path) < len(path_to_goal):
-            path_to_goal = path.copy()
+    if len(path) + 1 >= distance[current.x][current.y]:
+        return
+    if path_to_goal and len(path) + 1 >= len(path_to_goal):
+        return
+    if current == goal:
+        path_to_goal = path.copy() + [current]
         return
 
-    # move into neighbouring cells
-    moves = [start + direction for direction in (Cell(1, 0), Cell(0, 1), Cell(-1, 0), Cell(0, -1))]
-    for new_cell in sorted(moves, key=goal.manhattan):
-        # check that we can move there and not meet enemies
-        if not can_move(map_, new_cell):
+    visited[current.x][current.y] = True
+    distance[current.x][current.y] = len(path) + 1
+    path.append(current)
+    ask_to_move(map_, current)
+
+    neighbours = get_accessible_neighbours(current)
+    neighbours.sort(key=goal.manhattan)
+    for neighbour in neighbours:
+        if visited[neighbour.x][neighbour.y]:
             continue
-        # check that we did not visit it
-        if visited[new_cell.x][new_cell.y]:
-            continue
-        # if we encounter a shield
-        if map_[new_cell.x][new_cell.y] == Character.SHIELD:
-            # update the path to it
+        if map_[neighbour.x][neighbour.y] == Character.SHIELD:
             if not path_to_shield or len(path) + 1 < len(path_to_shield):
-                path_to_shield = path.copy() + [new_cell]
-            # mark it as visited
-            visited[new_cell.x][new_cell.y] = True
-            # do not grab it
+                path_to_shield = path.copy() + [neighbour]
+            continue
+        if not move_is_empty(map_, neighbour):
             continue
 
-        # explore the neigbouring cell
-        dfs(map_, new_cell, goal, path, False)
+        backtracking(map_, neighbour, goal, path, variant_number)
+        ask_to_move(map_, current)
 
-        # backtracking into `start`
-        ask_to_move(map_, start)
-        path.append(start)
+        if neighbour == goal:
+            break
 
-
-def dfs_shortest(
-    map_: List[List[Character]],
-    start: Cell,
-    goal: Cell,
-    path: List[Cell],
-    reset_visited: bool = True,
-    update_goal: bool = True,
-    can_visit_shield: bool = True,
-) -> None:
-    """Traverses recursively the `map_` without using the interactor.
-
-    Stores the shortest path to `goal` in global variable `path_to_goal`
-
-    Stores the shortest path to the shield in global variable `path_to_shield`.
-
-    Keeps track of visited cells in global variable `visited`.
-
-    Args:
-        map_ (List[List[Entity]]): Map.
-        start (Cell): Source cell.
-        goal (Cell): Destination cell.
-        path (List[Cell]): Current path.
-        reset_visited (bool, optional): Whether to reset `visited` variable. Defaults to True.
-    """
-    global path_to_goal, path_to_shield, visited
-
-    if reset_visited:
-        visited = [[False for _ in range(N)] for _ in range(N)]
-
-    # visit a new cell
-    visited[start.x][start.y] = True
-    # add it to our current path
-    path.append(start)
-
-    # when we reach our destination we can update the path to it and continue the exploitation
-    if start == goal:
-        if not path_to_goal or len(path) < len(path_to_goal):
-            if update_goal:
-                path_to_goal = path.copy()
-        # no more short paths are available
-        # because the length is equal to manhattan distance
-        if len(path) - 1 == path[0].manhattan(path[-1]):
-            raise NoMoreShortPaths()
-    elif not path_to_goal or len(path) < len(path_to_goal) - 1:
-        # visit neighbours in such manner that we check the ones with smaller distance first
-        moves = [start + direction for direction in (Cell(1, 0), Cell(0, 1), Cell(-1, 0), Cell(0, -1))]
-        for new_cell in sorted(moves, key=goal.manhattan):
-            # check that we can move there and not meet enemies
-            if not can_move(map_, new_cell):
-                continue
-            # check that we did not visit it
-            if visited[new_cell.x][new_cell.y]:
-                continue
-            # if we encounter a shield
-            if map_[new_cell.x][new_cell.y] == Character.SHIELD:
-                # update the path to it
-                if not path_to_shield or len(path) + 1 < len(path_to_shield):
-                    path_to_shield = path.copy() + [new_cell]
-                # do not grab it
-                if not can_visit_shield:
-                    continue
-
-            # exploit the neighbour
-            dfs_shortest(map_, new_cell, goal, path, False, update_goal)
-
-    # backtracking:
-    # unmark the cell, so we can visit it in the future
-    visited[start.x][start.y] = False
-    # remove the cell from path
+    visited[current.x][current.y] = False
     path.pop()
 
 
 def main():
-    global path_to_goal, path_to_shield
+    global visited, distance
 
     variant_number = int(input())
     x, y = map(int, input().split())
     goal = Cell(x, y)
     start = Cell(0, 0)
-    shield = Cell(-1, -1)
+    map_: List[List[Character]] = [[Character.EMPTY for _ in range(N)] for _ in range(N)]
 
-    # first we explore the map from start without picking up the shield
-    without_shield_map = [[Character.EMPTY for _ in range(N)] for _ in range(N)]
-    dfs(without_shield_map, start, goal, [])
+    backtracking(map_, start, goal, [], variant_number)
 
-    # find the location if the shield if found
-    for i in range(N):
-        for j in range(N):
-            if without_shield_map[i][j] == Character.SHIELD:
-                shield = Cell(i, j)
-
-    # if we have reached the goal then we can find the shortest path to it (explore then exploit)
-    if visited[goal.x][goal.y]:
-        try:
-            dfs_shortest(without_shield_map, start, goal, [])
-        except NoMoreShortPaths:
-            pass
-
-    # if we have found the shield in the first exploration
-    if shield != Cell(-1, -1) and path_to_shield:
-        with_shield_map = [x[:] for x in without_shield_map]
-
-        # move to the shield
-        for cell in path_to_shield[:-1]:
-            ask_to_move(with_shield_map, cell)
-
-        # remove the perception zones from our map
-        # perception zone for Captain Marvel will reappear as we use the interactor
+    if path_to_shield:
+        for cell in path_to_shield[1:-1]:
+            ask_to_move(map_, cell)
         for i in range(N):
             for j in range(N):
-                if with_shield_map[i][j] == Character.PERCEPTION:
-                    with_shield_map[i][j] = Character.EMPTY
+                if map_[i][j] == Character.PERCEPTION:
+                    map_[i][j] = Character.EMPTY
+        visited = [[False for _ in range(N)] for _ in range(N)]
+        distance = [[N**3 for _ in range(N)] for _ in range(N)]
+        backtracking(map_, path_to_shield[-1], goal, path_to_shield[:-1], variant_number)
 
-        # explore the map with the shield from its location
-        dfs(with_shield_map, shield, goal, path_to_shield[:-1])
-
-        # if we have reached the goal then we can find the shortest path to it (explore then exploit)
-        if visited[goal.x][goal.y]:
-            # first we find the shortest path to the shield
-            try:
-                dfs_shortest(without_shield_map, start, shield, [], update_goal=False)
-            except NoMoreShortPaths:
-                pass
-            # then we find the shortest path from the shield to the goal
-            try:
-                dfs_shortest(with_shield_map, shield, goal, path_to_shield[:-1])
-            except NoMoreShortPaths:
-                pass
-    # print the length of the shortest path from `start` to `goal`
-    # note: if path_to_goal is empty, then -1 will be printed
     print(f"e {len(path_to_goal) - 1}")
 
 
