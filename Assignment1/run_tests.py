@@ -185,7 +185,7 @@ def main():
                         print("-" * DASH_LENGTH)
                         lines = proc.stderr.readlines()
                         for line in lines:
-                            print(line.decode("UTF-8").rstrip())
+                            print(line.decode("cp1251").rstrip())
                         print("-" * DASH_LENGTH)
 
                         kill(proc)
