@@ -113,6 +113,13 @@ def parse_args() -> Namespace:
         help="Path to the output csv file",
         default="output.csv",
     )
+    parser.add_argument(
+        "-tl",
+        "--timelimit",
+        type=int,
+        help="Whether to stop a solution after specified amount of seconds. -1 means no time limit",
+        default=-1,
+    )
     return parser.parse_args()
 
 
@@ -239,6 +246,11 @@ def main():
                         break
                     else:
                         print(output)
+                    if args.timelimit >= 0 and time.time() - start_time >= args.timelimit:
+                        print("[ERROR] Time limit exceeded")
+                        fp.write(f"{test},{-2},{float('inf')}\n")
+                        kill(proc)
+                        break
                 except KeyboardInterrupt:
                     kill(proc)
                     exit(1)
