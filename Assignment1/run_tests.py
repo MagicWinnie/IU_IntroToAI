@@ -72,7 +72,11 @@ def get_order(file):
 
 def kill(process):
     if os.name == "nt":  # Windows
-        subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=process.pid))
+        subprocess.Popen(
+            "TASKKILL /F /PID {pid} /T".format(pid=process.pid),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     else:
         import signal
 
@@ -126,12 +130,16 @@ def main():
         for test in sorted(tests, key=get_order):
             print("-" * (DASH_LENGTH // 2) + test + "-" * (DASH_LENGTH // 2))
 
+            print("[INFO] Current map:")
             map_ = [["." for _ in range(N)] for _ in range(N)]
             infinity_stone = (-1, -1)
             captain_marvel = (-1, -1)
             with open(test, "r") as test_fp:
                 for i, line in enumerate(test_fp):
                     for j, entity in enumerate(line.split()):
+                        if entity not in ".PSIHTM":
+                            print("[ERROR] Incorrect entity in the map")
+                            exit(1)
                         if entity == "I":
                             infinity_stone = (i, j)
                         elif entity == "M":
@@ -142,7 +150,8 @@ def main():
             prev_cell = (0, 0)
             variant_number = args.variant if args.variant in (1, 2) else randint(1, 2)
 
-            print("Variant number:", variant_number)
+            print("[INFO] Variant number:", variant_number)
+            print("[INFO] Program output:")
 
             proc = subprocess.Popen(
                 args.cmd.split(),
@@ -173,7 +182,13 @@ def main():
 
                         kill(proc)
                         exit(1)
-                    elif output[0] == "m":
+                    output_splitted = output.split()
+                    if (
+                        len(output_splitted) == 3
+                        and output_splitted[0] == "m"
+                        and output_splitted[1].isdigit()
+                        and output_splitted[2].isdigit()
+                    ):
                         _, x, y = output.split()
                         move_cell = (int(x), int(y))
                         if m_dist(move_cell, prev_cell) > 1:
@@ -210,12 +225,19 @@ def main():
                         for cell, entity in surroundings:
                             proc.stdin.write(f"{cell[0]} {cell[1]} {entity}\n".encode("ASCII"))
                         proc.stdin.flush()
-                    elif output[0] == "e":
-                        print("Output:", output)
+                    elif (
+                        len(output_splitted) == 2
+                        and output_splitted[0] == "e"
+                        and output_splitted[1].replace("-", "", 1).isdigit()
+                    ):
+                        print("[INFO] Answer:", output)
                         end_time = time.time()
-                        kill(proc)
                         fp.write(f"{test},{output.split()[1]},{end_time - start_time}\n")
+
+                        kill(proc)
                         break
+                    else:
+                        print(output)
                 except KeyboardInterrupt:
                     kill(proc)
                     exit(1)
