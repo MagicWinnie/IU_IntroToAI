@@ -79,18 +79,37 @@ def move_is_empty(map_: List[List[Character]], pos: Cell) -> bool:
     return map_[pos.x][pos.y] in (Character.EMPTY, Character.INFINITY_STONE)
 
 
-def ask_to_move(map_: List[List[Character]], pos: Cell) -> None:
+def ask_to_move(map_: List[List[Character]], pos: Cell, variant: int, with_shield: bool) -> None:
     """Ask the interactor to move into `pos` and gather information about surroundings.
 
     Args:
         map_ (List[List[Entity]]): Map.
         pos (Cell): Cell that one wants to move into.
+        variant (int): Thanos' perception variant.
+        with_shield (bool): Whether we are with the Shield.
     """
     print(f"m {pos.x} {pos.y}")
     n = int(input())
     for _ in range(n):
-        x, y, e = input().split()
-        map_[int(x)][int(y)] = Character(e)
+        x_, y_, e_ = input().split()
+        x, y, e = int(x_), int(y_), Character(e_)
+        # if we put the character the first time
+        if map_[x][y] == Character.EMPTY:
+            # for variant 1 we can be sure only for Hulk
+            if variant == 1:
+                if not with_shield:
+                    if e == Character.HULK:
+                        build_hulk_perception(map_, Cell(x, y))
+            elif variant == 2:
+                # for variant 2 we are sure about everyone
+                if e == Character.CAPTAIN_MARVEL:
+                    build_marvel_perception(map_, Cell(x, y))
+                if not with_shield:
+                    if e == Character.HULK:
+                        build_hulk_perception(map_, Cell(x, y))
+                    elif e == Character.THOR:
+                        build_thor_perception(map_, Cell(x, y))
+            map_[x][y] = e
 
 
 def get_accessible_neighbours(pos: Cell) -> List[Cell]:
@@ -112,20 +131,70 @@ def get_accessible_neighbours(pos: Cell) -> List[Cell]:
     return neighbours
 
 
-def get_accessible_perception(pos: Cell, variant: int) -> List[Cell]:
-    # 8 cells surrounding thanos
-    perception = (Cell(1, 0), Cell(1, 1), Cell(0, 1), Cell(-1, 1), Cell(-1, 0), Cell(-1, -1), Cell(0, -1), Cell(1, -1))
-    # if variant is 2 then we also have ears
-    if variant == 2:
-        perception += (Cell(2, 2), Cell(-2, 2), Cell(-2, -2), Cell(2, -2))
+def build_thor_perception(map_: List[List[Character]], center: Cell) -> None:
+    """Put Thor's perception zones onto the map.
 
-    neighbours = []
-    for direction in perception:
-        neighbour = pos + direction
-        if move_in_map(neighbour):
-            neighbours.append(neighbour)
+    Args:
+        map_ (List[List[Character]]): Map itself.
+        center (Cell): Cell with Thor.
+    """
+    for direction in (
+        Cell(1, 0),
+        Cell(1, 1),
+        Cell(0, 1),
+        Cell(-1, 1),
+        Cell(-1, 0),
+        Cell(-1, -1),
+        Cell(0, -1),
+        Cell(1, -1),
+    ):
+        cell = center + direction
+        if move_in_map(cell) and map_[cell.x][cell.y] == Character.EMPTY:
+            map_[cell.x][cell.y] = Character.PERCEPTION
 
-    return neighbours
+
+def build_hulk_perception(map_: List[List[Character]], center: Cell) -> None:
+    """Put Hulk's perception zones onto the map.
+
+    Args:
+        map_ (List[List[Character]]): Map itself.
+        center (Cell): Cell with Hulk.
+    """
+    for direction in (
+        Cell(1, 0),
+        Cell(0, 1),
+        Cell(-1, 0),
+        Cell(0, -1),
+    ):
+        cell = center + direction
+        if move_in_map(cell) and map_[cell.x][cell.y] == Character.EMPTY:
+            map_[cell.x][cell.y] = Character.PERCEPTION
+
+
+def build_marvel_perception(map_: List[List[Character]], center: Cell) -> None:
+    """Put Captain Marvel's perception zones onto the map.
+
+    Args:
+        map_ (List[List[Character]]): Map itself.
+        center (Cell): Cell with Captain Marvel.
+    """
+    for direction in (
+        Cell(1, 0),
+        Cell(1, 1),
+        Cell(0, 1),
+        Cell(-1, 1),
+        Cell(-1, 0),
+        Cell(-1, -1),
+        Cell(0, -1),
+        Cell(1, -1),
+        Cell(2, 0),
+        Cell(0, 2),
+        Cell(-2, 0),
+        Cell(0, -2),
+    ):
+        cell = center + direction
+        if move_in_map(cell) and map_[cell.x][cell.y] == Character.EMPTY:
+            map_[cell.x][cell.y] = Character.PERCEPTION
 
 
 # storing whether one has visited cell (i, j)
@@ -144,6 +213,7 @@ def backtracking(
     goal: Cell,
     path: List[Cell],
     variant_number: int,
+    with_shield: bool,
 ) -> None:
     """Backtracking algorithm to find the shortest path between `current` and `goal`.
     Puts the path for the goal in global `path_to_goal`.
@@ -155,6 +225,7 @@ def backtracking(
         goal (Cell): Goal cell.
         path (List[Cell]): Current path before entering `current`.
         variant_number (int): Variant of Thanos' vision.
+        with_shield (bool): Whether Thanos is under shield's effects.
     """
     global path_to_goal, path_to_shield, visited, distance
 
@@ -177,7 +248,9 @@ def backtracking(
     # update the path with our current cell
     path.append(current)
     # move the interactor to the current cell
-    ask_to_move(map_, current)
+    ask_to_move(map_, current, variant_number, with_shield)
+
+    # in variant 2 we can see into cells where thor and captain marvel are located
 
     # get neighbours and sort them by their distance to the goal
     neighbours = get_accessible_neighbours(current)
@@ -198,9 +271,9 @@ def backtracking(
             continue
 
         # recursive call on the neighbour
-        backtracking(map_, neighbour, goal, path, variant_number)
+        backtracking(map_, neighbour, goal, path, variant_number, with_shield)
         # move the interactor back so next neighbour can run
-        ask_to_move(map_, current)
+        ask_to_move(map_, current, variant_number, with_shield)
 
         # do not check others if the goal can be reached from here
         if neighbour == goal:
@@ -223,13 +296,13 @@ def main() -> None:
     map_: List[List[Character]] = [[Character.EMPTY for _ in range(N)] for _ in range(N)]
 
     # run backtracking from start to goal without picking up the shield
-    backtracking(map_, start, goal, [], variant_number)
+    backtracking(map_, start, goal, [], variant_number, False)
 
     # if the shield was spotted and is accessible
     if path_to_shield:
         # move to the shield to pick it up
         for cell in path_to_shield[1:-1]:
-            ask_to_move(map_, cell)
+            ask_to_move(map_, cell, variant_number, True)
         # remove perception zones
         # captain marvels perception zone will be restore when asking interactor
         for i in range(N):
@@ -240,7 +313,7 @@ def main() -> None:
         visited = [[False for _ in range(N)] for _ in range(N)]
         distance = [[N**3 for _ in range(N)] for _ in range(N)]
         # run backtracking from shield to goal
-        backtracking(map_, path_to_shield[-1], goal, path_to_shield[:-1], variant_number)
+        backtracking(map_, path_to_shield[-1], goal, path_to_shield[:-1], variant_number, True)
 
     # print the shortest path
     # note: if path_to_goal is empty then -1 will be printed
