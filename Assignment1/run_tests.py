@@ -172,12 +172,13 @@ def main():
 
             while True:
                 try:
-                    output = proc.stdout.readline().decode("ASCII").strip()
+                    output = proc.stdout.readline().decode("UTF-8").strip()
                     if not output:
                         print("[ERROR] An exception was raised while running:")
                         print("-" * DASH_LENGTH)
-                        for line in proc.stderr.readlines():
-                            print(line.decode("ASCII").rstrip())
+                        lines = proc.stderr.readlines()
+                        for line in lines:
+                            print(line.decode("UTF-8").rstrip())
                         print("-" * DASH_LENGTH)
 
                         kill(proc)
