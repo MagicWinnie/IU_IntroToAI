@@ -338,7 +338,7 @@ def main():
                     if map_[i][j] == Character.PERCEPTION:
                         map_[i][j] = Character.EMPTY
             # find the shortest path from the shield to the goal
-            min_path_from_shield = a_star(map_, shield, goal, heuristics, False, False, variant_number)
+            min_path_from_shield = a_star(map_, shield, goal, heuristics, True, False, variant_number)
             if min_path_from_shield:
                 # update the shortest path if neccessary
                 min_path_with_shield = min_path_to_shield[:-1] + min_path_from_shield
