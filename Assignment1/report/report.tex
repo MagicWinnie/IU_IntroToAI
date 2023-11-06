@@ -39,7 +39,7 @@
 
 
 \title{Assignment 1 - Report}
-\author{Dmitriy Okoneshnikov, B22-CS-01}
+\author{Dmitriy Okoneshnikov, B22-CS-01 \\ \href{mailto:d.okoneshnikov@innopolis.university}{d.okoneshnikov@innopolis.university} \\ \url{https://codeforces.com/profile/magicwinnie}}
 
 \begin{document}
 
@@ -56,22 +56,29 @@ The general idea for both of my algorithms is following:
     \item Compare the two distances and choose the shortest
 \end{enumerate}
 \subsection{Backtracking search}
-For backtracking I have used Depth-First Search (described on the lecture). Two versions of DFS were used: for exploration and for exploitation.
-The former uses the interactor and the latter does not use the interactor. Exploration DFS finds the first path to the goal and exploitation DFS finds the shortest path.
-Latter has optimizations for length of the current path and to exit the recursion if no short paths were found.
+Submission: \url{https://codeforces.com/group/ux8yi0gQhD/contest/479327/submission/231522968}
+
+For backtracking I have used a modified version of Depth-First Search (described on lecture 5).
+Standard DFS was changed to allow the search of all paths rather than finding the first path to the goal.
+Some optimizations related to cutting off paths with worse distances to a cell were used.
+Also neighbours of a cell are visited in such order that those that are closer to the goal are visited first.
 All the information about the characters is stored in a map.
 
-I start of by using the exploration DFS to put the characters onto the map and find out whether it is possible to reach the goal without the Shield.
-If the Stone was reached, then using the exploitation DFS I find the shortest path to it.
-After that I check whether the Shield was found and its cell could be reached. If so, I move to the cell with the Shield and explore the map with it. 
-If the Stone was reached, then using the exploitation DFS I find the shortest path to the Shield and to the Stone from it.
-Finally, I find the shortest path among the two.
+I start off by finding the shortest path (if any) from the start to the goal without picking up the Shield as it would be with us until the end of the test.
+If the Shield was found and it is accessible, then I move to the cell with it and run the algorithm once again to find the shortest path from the Shield to the goal. 
+Finally, I compare the paths and find the shortest one.
+
+The information about Thanos' perception is used to build perception zones of enemies, and, therefore, decrease number of cells to check.
 \subsection{A* search}
+Submission: \url{https://codeforces.com/group/ux8yi0gQhD/contest/479327/submission/231523695}
+
 For A* I have used the algorithm described in Wikipedia (\url{https://en.wikipedia.org/wiki/A*_search_algorithm#Pseudocode}). The only change in the algorithm was to prevent teleportation: for each step I move back the interactor to the start and move from there to the new cell.
 All the information about the characters is stored in a map.
 
 I start of by running A* to the Stone. If the Shield was found and can be reached then I run A* to the Shield and from it to the goal.
 Finally, I find the shortest path among the two.
+
+The information about Thanos' perception is used to build perception zones of enemies, and, therefore, decrease number of cells to check.
 
 \section{Statistical comparison}
 For generating maps and running the solutions on them, a generator and an interactor scripts were written by me and tested by Matvey Korinenko. Note that these scripts were shared with other students. They can be found in the following Github Gist: \url{https://gist.github.com/MagicWinnie/d8899001c41c851bdc1ae9a10def8fb4}
@@ -89,43 +96,67 @@ The CSV file then can be used to count the statistics manually or through other 
         \multicolumn{2}{c|}{} & Variant 1 & Variant 2 & Variant 1 & Variant 2 \\
         \hline
         \hline
-        \multirow{4}{*}{Time} & Mean, $s$ & 0.289 & 0.290 & 0.049 & 0.061 \\
+        \multirow{4}{*}{Time} & Mean, $s$ & 0.096 & 0.099 & 0.078 & 0.086 \\
         \cline{2-6}
-        & Mode, $s$ & 0.083 & 0.093 & 0.037 & 0.045 \\
+        & Mode, $s$ & 0.068 & 0.062 & 0.065 & 0.070 \\
         \cline{2-6}
-        & Median, $s$ & 0.086 & 0.117 & 0.050 & 0.049 \\
+        & Median, $s$ & 0.111 & 0.098 & 0.079 & 0.073 \\
         \cline{2-6}
-        & $\sigma$, $s$ & 1.672 & 1.521 & 0.012 & 0.020 \\
+        & $\sigma$, $s$ & 0.047 & 0.055 & 0.020 & 0.027 \\
         \hline
-        \multirow{4}{*}{Tests} & Wins & \multicolumn{4}{c}{914} \\
+        \multirow{6}{*}{Wins} & Count & \multicolumn{4}{c}{914} \\
         \cline{2-6}
-        & Wins, $\%$ & \multicolumn{4}{c}{91.4} \\
+        & $\%$ & \multicolumn{4}{c}{91.4} \\
         \cline{2-6}
-        & Losses & \multicolumn{4}{c}{86} \\
+        & Mean & \multicolumn{4}{c}{914} \\
         \cline{2-6}
-        & Losses, $\%$ & \multicolumn{4}{c}{8.6} \\
+        & Mode & \multicolumn{4}{c}{914} \\
+        \cline{2-6}
+        & Median & \multicolumn{4}{c}{914} \\
+        \cline{2-6}
+        & $\sigma$ & \multicolumn{4}{c}{0} \\
+        \hline
+        \multirow{6}{*}{Losses} & Count & \multicolumn{4}{c}{86} \\
+        \cline{2-6}
+        & $\%$ & \multicolumn{4}{c}{8.6} \\
+        \cline{2-6}
+        & Mean & \multicolumn{4}{c}{86} \\
+        \cline{2-6}
+        & Mode & \multicolumn{4}{c}{86} \\
+        \cline{2-6}
+        & Median & \multicolumn{4}{c}{86} \\
+        \cline{2-6}
+        & $\sigma$ & \multicolumn{4}{c}{0} \\
     \end{tabular}
     \caption{Comparison of statistics for all algorithms}
     \label{fig:statistics}
 \end{figure}
 
 The results in table \ref{fig:statistics} were received by running the interactor on the same 1000 tests for all combinations of algorithms and perception variants.
+
 All of them gave the same answers for the tests.
 Therefore, number of wins, number of losses, and their percentages are equal for all columns.
+For this reason, mean, mode, median for count of wins/losses are equal to count of wins/losses.
+And standard deviations for count of wins/losses are equal to 0.
+
 For counting modes the execution times were rounded to 3 digits after the decimal point.
 
 \subsection{Backtracking (variant 1) compared to A* (variant 1)} \label{backtracking_1_vs_a_star_1}
-It is obvious from table \ref{fig:statistics} that A* outperforms Backtracking in everything.
-In mean time A* is $\approx 6$ times faster, but when we look at values that are not that affected by outliers, then actually A* is faster for only $\approx 2$ times.
-The tests on which outliers are created can be accessed in section \ref{interesting_maps}.
-Also it is interesting to look at the standard deviations: it is much larger for Backtracking due to my implementation. A* works with almost the same time for all tests.
+It is obvious from table \ref{fig:statistics} that A* outperforms Backtracking.
+In mean time A* is $\approx 1.2$ times faster, but when we look at values that are not that affected by outliers, then actually A* is faster for $\approx 1.4$ times.
+Also it is interesting to look at the standard deviations: it is $\approx 2$ times larger for Backtracking, than for A*.
+Which means that A* works for different tests with closer times than Backtracking.
+Values of wins and losses were discussed above.
 \subsection{Backtracking (variant 2) compared to A* (variant 2)}
 It, basically, repeats the information given in subsection \ref{backtracking_1_vs_a_star_1}.
-\subsection{Backtracking (variant 1) compared to Backtracking (variant 2)} \label{backtracking_1_vs_backtracking_2}
-Mean, mode, and median times for variant 2 are a little bit higher compared to variant 1. This is possibly due to more information being read from the interactor and writing it to the map.
-Standard deviation for variant 2 is a little bit smaller and, currently, I do not know why this has happened.
+\subsection{Backtracking (variant 1) compared to Backtracking (variant 2)}
+Mean time and standard deviation of time for variant 1 is smaller than in variant 2, but other values are larger.
+It means that for variant 2 there were some tests that executed with a more larger time, which led to increase in $\sigma$ and mean time.
+But generally, variant 2 executed a little bit faster.
 \subsection{A* (variant 1) compared to A* (variant 2)}
-It is, basically, the same as in subsection \ref{backtracking_1_vs_backtracking_2}: variant 2 is a little bit slower compared to variant 1. However, the standard deviation for variant 2 is a little bit higher than in variant 1.
+In A*, variant 2 did not give any time win as every value excpet median of time increased.
+This could mean that there is some problem in the implementation, but this should be investigated.
+
 \section{PEAS description}
 \subsection{Performance Measure}
 The performance measure for Thanos would be reaching the Infinity Stone in the fastest way possible.
@@ -204,60 +235,7 @@ These are some examples of impossible maps found by my solution (from 1000 of to
     \caption{Shield is reachable, but Infinity Stone is surrounded by Captain Marvel}
 \end{figure}
 
-\section{Interesting outcomes or maps} \label{interesting_maps}
-There were some tests (14 from 1000 of total maps generated) on which my implementation of Backtracking would not fit into the time limit set on Codeforces.
-This happens due to the presence of large chunks of free cells on the map as the Avengers were generated close to each other and on the edges of the map.
-Some examples of these tests:
-
-\begin{figure}[H]
-    \centering
-    \large
-    \begin{TAB}(e,0.75cm,0.75cm){|c:c:c:c:c:c:c:c:c|}{|c:c:c:c:c:c:c:c:c|}
-        A &   & P & H & P &   &   &   &   \\
-          &   &   & P &   & P & I &   &   \\
-          &   &   &   & P & P & P &   &   \\
-          &   &   & P & P & M & P & P &   \\
-          &   &   &   & P & P & P &   &   \\
-          &   &   &   &   & P &   &   &   \\
-          &   &   &   & S &   &   &   &   \\
-        P & P & P &   &   &   &   &   &   \\
-        P & T & P &   &   &   &   &   &   \\
-    \end{TAB}
-    \caption{Execution time is 7.655 seconds}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \large
-    \begin{TAB}(e,0.75cm,0.75cm){|c:c:c:c:c:c:c:c:c|}{|c:c:c:c:c:c:c:c:c|}
-        A &   &   &   &   &   &   &   &   \\
-          &   &   &   &   & S &   &   &   \\
-          &   & P &   &   &   &   &   &   \\
-          & P & P & P &   &   &   &   &   \\
-        P & P & M & P & P &   &   &   &   \\
-          & P & P & P & P & P &   &   &   \\
-          & I & P & P & T & P &   &   & P \\
-          &   &   & P & P & P &   & P & H \\
-          &   &   &   &   &   &   &   & P \\
-    \end{TAB}
-    \caption{Execution time is 18.821 seconds}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \large
-    \begin{TAB}(e,0.75cm,0.75cm){|c:c:c:c:c:c:c:c:c|}{|c:c:c:c:c:c:c:c:c|}
-        A &   &   & P & T & P & I &   &   \\
-          &   &   & P & P & P &   &   &   \\
-        S &   &   &   & P & P & P &   &   \\
-          &   &   & P & P & M & P & P &   \\
-          &   &   &   & P & P & P &   &   \\
-          &   &   &   &   & P &   &   &   \\
-          &   &   &   &   &   &   &   &   \\
-          &   & P &   &   &   &   &   &   \\
-          & P & H & P &   &   &   &   &   \\
-    \end{TAB}
-    \caption{Execution time is 32.684 seconds}
-\end{figure}
+\section{Interesting outcomes or maps}
+No interesting outcomes or maps were observed.
 
 \end{document}
