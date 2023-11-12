@@ -61,25 +61,53 @@ class Crossword:
         return string[:-1]
 
 
+def dfs(grid: list[list[str]], start: tuple[int, int], visited: list[list[bool]]):
+    visited[start[0]][start[1]] = True
+    if start[0] > 0 and grid[start[0] - 1][start[1]] != "." and not visited[start[0] - 1][start[1]]:
+        dfs(grid, (start[0] - 1, start[1]), visited)
+    if start[0] < len(grid) - 1 and grid[start[0] + 1][start[1]] != "." and not visited[start[0] + 1][start[1]]:
+        dfs(grid, (start[0] + 1, start[1]), visited)
+    if start[1] > 0 and grid[start[0]][start[1] - 1] != "." and not visited[start[0]][start[1] - 1]:
+        dfs(grid, (start[0], start[1] - 1), visited)
+    if start[1] < len(grid) - 1 and grid[start[0]][start[1] + 1] != "." and not visited[start[0]][start[1] + 1]:
+        dfs(grid, (start[0], start[1] + 1), visited)
+
+
 def fitness(individual: Crossword) -> float:
     penalty = 0
+    grid = individual.get_grid()
 
-    intersections: set[Location] = set()
+    # check if connected
+    visited = [[False for _ in range(len(grid))] for _ in range(len(grid))]
+    dfs(grid, (individual.locations[0].x, individual.locations[0].y), visited)
     for i in range(len(individual.words)):
         word, location = individual.words[i], individual.locations[i]
 
-        # words are out of grid
+        if not visited[location.x][location.y]:
+            penalty += 1
         if location.direction == Direction.HORIZONTAL:
+            # words are out of grid
             if location.y + len(word) - 1 >= individual.N:
                 penalty += 1
+            # words are not surrounded by another word
+            if location.y > 0 and grid[location.x][location.y - 1] != ".":
+                penalty += 1
+            # words are not surrounded by another word
+            if location.y + len(word) < individual.N and grid[location.x][location.y + len(word)] != ".":
+                penalty += 1
         elif location.direction == Direction.VERTICAL:
+            # words are out of grid
             if location.x + len(word) - 1 >= individual.N:
+                penalty += 1
+            # words are not surrounded by another word
+            if location.x > 0 and grid[location.x - 1][location.y] != ".":
+                penalty += 1
+            # words are not surrounded by another word
+            if location.x + len(word) < individual.N and grid[location.x + len(word)][location.y] != ".":
                 penalty += 1
 
         for j in range(i + 1, len(individual.words)):
             word_, location_ = individual.words[j], individual.locations[j]
-            if location == location_:
-                continue
             if location.direction == Direction.HORIZONTAL and location_.direction == Direction.HORIZONTAL:
                 # check if two are located next to each other
                 if abs(location.x - location_.x) <= 1:
@@ -99,27 +127,15 @@ def fitness(individual: Crossword) -> float:
             elif location.direction == Direction.HORIZONTAL and location_.direction == Direction.VERTICAL:
                 # check if intersection is same character
                 if location.y <= location_.y <= location.y + len(word) - 1:
-                    if location_.y - (location.y + len(word) - 1) == 1:
-                        penalty += 1
-                    if (location_.x + len(word_) - 1) - location.x == 1:
-                        penalty += 1
                     if location_.x <= location.x <= location_.x + len(word_) - 1:
-                        intersections.add(Location(location.x, location_.y, Direction.HORIZONTAL))
                         if word[location_.y - location.y] != word_[location.x - location_.x]:
                             penalty += 1
             elif location.direction == Direction.VERTICAL and location_.direction == Direction.HORIZONTAL:
                 # check if intersection is same character
                 if location.x <= location_.x <= location.x + len(word) - 1:
-                    if location_.y - location.y == 1:
-                        penalty += 1
-                    if location_.x - location.x == 1:
-                        penalty += 1
                     if location_.y <= location.y <= location_.y + len(word_) - 1:
-                        intersections.add(Location(location_.x, location.y, Direction.HORIZONTAL))
                         if word[location_.x - location.x] != word_[location.y - location_.y]:
                             penalty += 1
-    # check if connected
-    penalty += max(len(individual.words) - 1 - len(intersections), 0)
 
     if penalty == 0:
         return float("inf")
@@ -171,8 +187,6 @@ def mutate(offspring: Crossword) -> Crossword:
         random.randint(0, offspring.N - 1),
         random.choice((Direction.HORIZONTAL, Direction.VERTICAL)),
     )
-    # i, j = random.sample(range(len(offspring.locations)), 2)
-    # offspring.locations[i], offspring.locations[j] = offspring.locations[j], offspring.locations[i]
     return offspring
 
 
