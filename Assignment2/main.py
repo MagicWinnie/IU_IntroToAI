@@ -98,22 +98,26 @@ def fitness(individual: Crossword) -> float:
                         penalty += 1
             elif location.direction == Direction.HORIZONTAL and location_.direction == Direction.VERTICAL:
                 # check if intersection is same character
-                if (
-                    location.y <= location_.y <= location.y + len(word) - 1
-                    and location_.x <= location.x <= location_.x + len(word_) - 1
-                ):
-                    intersections.add(Location(location.x, location_.y, Direction.HORIZONTAL))
-                    if word[location_.y - location.y] != word_[location.x - location_.x]:
+                if location.y <= location_.y <= location.y + len(word) - 1:
+                    if location_.y - (location.y + len(word) - 1) == 1:
                         penalty += 1
+                    if (location_.x + len(word_) - 1) - location.x == 1:
+                        penalty += 1
+                    if location_.x <= location.x <= location_.x + len(word_) - 1:
+                        intersections.add(Location(location.x, location_.y, Direction.HORIZONTAL))
+                        if word[location_.y - location.y] != word_[location.x - location_.x]:
+                            penalty += 1
             elif location.direction == Direction.VERTICAL and location_.direction == Direction.HORIZONTAL:
                 # check if intersection is same character
-                if (
-                    location.x <= location_.x <= location.x + len(word) - 1
-                    and location_.y <= location.y <= location_.y + len(word_) - 1
-                ):
-                    intersections.add(Location(location_.x, location.y, Direction.HORIZONTAL))
-                    if word[location_.x - location.x] != word_[location.y - location_.y]:
+                if location.x <= location_.x <= location.x + len(word) - 1:
+                    if location_.y - location.y == 1:
                         penalty += 1
+                    if location_.x - location.x == 1:
+                        penalty += 1
+                    if location_.y <= location.y <= location_.y + len(word_) - 1:
+                        intersections.add(Location(location_.x, location.y, Direction.HORIZONTAL))
+                        if word[location_.x - location.x] != word_[location.y - location_.y]:
+                            penalty += 1
     # check if connected
     penalty += max(len(individual.words) - 1 - len(intersections), 0)
 
@@ -153,25 +157,22 @@ def get_parents(
 
 
 def cross(mother: Crossword, father: Crossword) -> Crossword:
-    # cross two parents together
-    # mother_head = mother[: int(len(mother) * 0.5)].copy()
-    # mother_tail = mother[int(len(mother) * 0.5) :].copy()
-    # father_tail = father[int(len(father) * 0.5) :].copy()
-
-    # mapping = {father_tail[i]: mother_tail[i] for i in range(len(mother_tail))}
-
-    # for i in range(len(mother_head)):
-    #     while mother_head[i] in father_tail:
-    #         mother_head[i] = mapping[mother_head[i]]
-
-    # return np.hstack([mother_head, father_tail])
-    return mother
+    locations = []
+    for mother_location, father_location in zip(mother.locations, father.locations):
+        locations.append(random.choice((mother_location, father_location)))
+    return Crossword(mother.words.copy(), locations)
 
 
 def mutate(offspring: Crossword) -> Crossword:
     offspring = deepcopy(offspring)
-    i, j = random.sample(range(len(offspring.locations)), 2)
-    offspring.locations[i], offspring.locations[j] = offspring.locations[j], offspring.locations[i]
+    i = random.randint(0, len(offspring.locations) - 1)
+    offspring.locations[i] = Location(
+        random.randint(0, offspring.N - 1),
+        random.randint(0, offspring.N - 1),
+        random.choice((Direction.HORIZONTAL, Direction.VERTICAL)),
+    )
+    # i, j = random.sample(range(len(offspring.locations)), 2)
+    # offspring.locations[i], offspring.locations[j] = offspring.locations[j], offspring.locations[i]
     return offspring
 
 
@@ -194,25 +195,37 @@ def evolution_step(
 def solution(
     words: list[str],
     fitness: Callable[[Crossword], float],
-    population_size: int = 100,
-    offsprings_size: int = 30,
-    generations: int = 100,
+    population_size: int = 400,
+    offsprings_size: int = 100,
+    generations: int = 200,
 ) -> Crossword:
     population = initial_population(words, population_size, fitness)
     best_individual = population[0]
     fitness_change: list[float] = []
-    for generation in range(generations):
+    # for generation in range(generations):
+    generation = 0
+    while True:
         population = evolution_step(population, fitness, offsprings_size)
         best_individual = population[-1]
         best_fitness = fitness(best_individual)
         fitness_change.append(best_fitness)
 
-        print("-" * 20)
-        print(f"Generation #{generation}")
-        print(f"Fitness: {best_fitness}")
-        print(best_individual)
-        print()
+        if generation % 100 == 0:
+            print("-" * 20)
+            print(f"Generation #{generation}")
+            print(f"Fitness: {best_fitness}")
+            print(best_individual)
+            print()
 
+        if best_fitness == float("inf"):
+            break
+        generation += 1
+
+    print("-" * 20)
+    print(f"Generation #{generation}")
+    print(f"Fitness: {best_fitness}")
+    print(best_individual)
+    print()
     plt.plot(fitness_change)
     plt.title("Change of a fitness score")
     plt.xlabel("Generation")
