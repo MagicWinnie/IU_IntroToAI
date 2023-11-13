@@ -80,6 +80,7 @@ def fitness(individual: Crossword) -> float:
     # check if connected
     visited = [[False for _ in range(len(grid))] for _ in range(len(grid))]
     dfs(grid, (individual.locations[0].x, individual.locations[0].y), visited)
+
     for i in range(len(individual.words)):
         word, location = individual.words[i], individual.locations[i]
 
@@ -112,16 +113,16 @@ def fitness(individual: Crossword) -> float:
                 # check if two are located next to each other
                 if abs(location.x - location_.x) <= 1:
                     if (
-                        location.y <= location_.y < location.y + len(word) - 1
-                        or location_.y <= location.y < location_.y + len(word_) - 1
+                        location.y <= location_.y <= location.y + len(word) - 1
+                        or location_.y <= location.y <= location_.y + len(word_) - 1
                     ):
                         penalty += 1
             elif location.direction == Direction.VERTICAL and location_.direction == Direction.VERTICAL:
                 # check if two are located next to each other
                 if abs(location.y - location_.y) <= 1:
                     if (
-                        location.x <= location_.x < location.x + len(word) - 1
-                        or location_.x <= location.x < location_.x + len(word_) - 1
+                        location.x <= location_.x <= location.x + len(word) - 1
+                        or location_.x <= location.x <= location_.x + len(word_) - 1
                     ):
                         penalty += 1
             elif location.direction == Direction.HORIZONTAL and location_.direction == Direction.VERTICAL:
