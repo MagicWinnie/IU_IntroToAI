@@ -2,7 +2,6 @@ from __future__ import annotations
 import os
 import random
 from enum import Enum
-from copy import deepcopy
 from typing import Callable
 from dataclasses import dataclass
 from matplotlib import pyplot as plt
@@ -27,6 +26,7 @@ class Crossword:
     def __init__(self, words: list[str], locations: list[Location] | None = None, N: int = 20):
         self.words = words
         self.N = N
+        self.grid: list[list[str]] | None = None
 
         if locations is None:
             self.locations = [
@@ -42,16 +42,17 @@ class Crossword:
             self.locations = locations
 
     def get_grid(self) -> list[list[str]]:
-        grid = [["." for _ in range(self.N)] for _ in range(self.N)]
-        for word, location in zip(self.words, self.locations):
-            for i, char in enumerate(word):
-                if location.direction == Direction.HORIZONTAL:
-                    if 0 <= location.x < self.N and 0 <= location.y + i < self.N:
-                        grid[location.x][location.y + i] = char
-                elif location.direction == Direction.VERTICAL:
-                    if 0 <= location.x + i < self.N and 0 <= location.y < self.N:
-                        grid[location.x + i][location.y] = char
-        return grid
+        if self.grid is None:
+            self.grid = [["." for _ in range(self.N)] for _ in range(self.N)]
+            for word, location in zip(self.words, self.locations):
+                for i, char in enumerate(word):
+                    if location.direction == Direction.HORIZONTAL:
+                        if 0 <= location.x < self.N and 0 <= location.y + i < self.N:
+                            self.grid[location.x][location.y + i] = char
+                    elif location.direction == Direction.VERTICAL:
+                        if 0 <= location.x + i < self.N and 0 <= location.y < self.N:
+                            self.grid[location.x + i][location.y] = char
+        return self.grid
 
     def __str__(self) -> str:
         grid = self.get_grid()
@@ -61,7 +62,7 @@ class Crossword:
         return string[:-1]
 
 
-def dfs(grid: list[list[str]], start: tuple[int, int], visited: list[list[bool]]):
+def dfs(grid: list[list[str]], start: tuple[int, int], visited: list[list[bool]]) -> None:
     visited[start[0]][start[1]] = True
     if start[0] > 0 and grid[start[0] - 1][start[1]] != "." and not visited[start[0] - 1][start[1]]:
         dfs(grid, (start[0] - 1, start[1]), visited)
@@ -81,36 +82,34 @@ def fitness(individual: Crossword) -> float:
     visited = [[False for _ in range(len(grid))] for _ in range(len(grid))]
     dfs(grid, (individual.locations[0].x, individual.locations[0].y), visited)
 
-    for i in range(len(individual.words)):
-        word, location = individual.words[i], individual.locations[i]
-
+    for i, (word, location) in enumerate(zip(individual.words, individual.locations)):
         if not visited[location.x][location.y]:
             penalty += 1
         if location.direction == Direction.HORIZONTAL:
             # words are out of grid
             if location.y + len(word) - 1 >= individual.N:
                 penalty += 1
-            # words are not surrounded by another word
+            # words are surrounded by another word
             if location.y > 0 and grid[location.x][location.y - 1] != ".":
                 penalty += 1
-            # words are not surrounded by another word
+            # words are surrounded by another word
             if location.y + len(word) < individual.N and grid[location.x][location.y + len(word)] != ".":
                 penalty += 1
         elif location.direction == Direction.VERTICAL:
             # words are out of grid
             if location.x + len(word) - 1 >= individual.N:
                 penalty += 1
-            # words are not surrounded by another word
+            # words are surrounded by another word
             if location.x > 0 and grid[location.x - 1][location.y] != ".":
                 penalty += 1
-            # words are not surrounded by another word
+            # words are surrounded by another word
             if location.x + len(word) < individual.N and grid[location.x + len(word)][location.y] != ".":
                 penalty += 1
 
         for j in range(i + 1, len(individual.words)):
             word_, location_ = individual.words[j], individual.locations[j]
             if location.direction == Direction.HORIZONTAL and location_.direction == Direction.HORIZONTAL:
-                # check if two are located next to each other
+                # two words are located next to each other
                 if abs(location.x - location_.x) <= 1:
                     if (
                         location.y <= location_.y <= location.y + len(word) - 1
@@ -118,7 +117,7 @@ def fitness(individual: Crossword) -> float:
                     ):
                         penalty += 1
             elif location.direction == Direction.VERTICAL and location_.direction == Direction.VERTICAL:
-                # check if two are located next to each other
+                # two words are located next to each other
                 if abs(location.y - location_.y) <= 1:
                     if (
                         location.x <= location_.x <= location.x + len(word) - 1
@@ -126,21 +125,19 @@ def fitness(individual: Crossword) -> float:
                     ):
                         penalty += 1
             elif location.direction == Direction.HORIZONTAL and location_.direction == Direction.VERTICAL:
-                # check if intersection is same character
+                # two words intersection is not same character
                 if location.y <= location_.y <= location.y + len(word) - 1:
                     if location_.x <= location.x <= location_.x + len(word_) - 1:
                         if word[location_.y - location.y] != word_[location.x - location_.x]:
                             penalty += 1
             elif location.direction == Direction.VERTICAL and location_.direction == Direction.HORIZONTAL:
-                # check if intersection is same character
+                # two words intersection is not same character
                 if location.x <= location_.x <= location.x + len(word) - 1:
                     if location_.y <= location.y <= location_.y + len(word_) - 1:
                         if word[location_.x - location.x] != word_[location.y - location_.y]:
                             penalty += 1
 
-    if penalty == 0:
-        return float("inf")
-    return 1 / penalty
+    return -(penalty**2)
 
 
 def initial_population(
@@ -160,7 +157,7 @@ def replace_population(
 ) -> list[Crossword]:
     size = len(population)
     population.extend(new_individuals)
-    population.sort(key=lambda x: fitness(x))
+    population.sort(key=fitness)
     return population[-size:]
 
 
@@ -177,17 +174,18 @@ def cross(mother: Crossword, father: Crossword) -> Crossword:
     locations = []
     for mother_location, father_location in zip(mother.locations, father.locations):
         locations.append(random.choice((mother_location, father_location)))
-    return Crossword(mother.words.copy(), locations)
+    return Crossword(mother.words, locations)
 
 
 def mutate(offspring: Crossword) -> Crossword:
-    offspring = deepcopy(offspring)
-    i = random.randint(0, len(offspring.locations) - 1)
-    offspring.locations[i] = Location(
-        random.randint(0, offspring.N - 1),
-        random.randint(0, offspring.N - 1),
-        random.choice((Direction.HORIZONTAL, Direction.VERTICAL)),
-    )
+    for _ in range(len(offspring.words) // 3):
+        i = random.randint(0, len(offspring.locations) - 1)
+        offspring.locations[i] = Location(
+            random.randint(0, offspring.N - 1),
+            random.randint(0, offspring.N - 1),
+            random.choice((Direction.HORIZONTAL, Direction.VERTICAL)),
+        )
+    offspring.grid = None
     return offspring
 
 
@@ -195,7 +193,7 @@ def evolution_step(
     population: list[Crossword],
     fitness: Callable[[Crossword], float],
     offsprings_size: int,
-):
+) -> list[Crossword]:
     mothers, fathers = get_parents(population, offsprings_size)
     offsprings = []
 
@@ -210,15 +208,22 @@ def evolution_step(
 def solution(
     words: list[str],
     fitness: Callable[[Crossword], float],
-    population_size: int = 400,
-    offsprings_size: int = 100,
-    generations: int = 200,
+    population_size: int = 200,
+    offsprings_size: int = 40,
 ) -> Crossword:
-    population = initial_population(words, population_size, fitness)
-    best_individual = population[0]
+    population = []
+    best_fitness = -float("inf")
+    for _ in range(5):
+        population_ = initial_population(words, population_size, fitness)
+        best_fitness_ = fitness(population_[-1])
+        if best_fitness_ > best_fitness:
+            population = population_
+            best_fitness = best_fitness_
+
+    best_individual = population[-1]
     fitness_change: list[float] = []
-    # for generation in range(generations):
     generation = 0
+
     while True:
         population = evolution_step(population, fitness, offsprings_size)
         best_individual = population[-1]
@@ -232,7 +237,7 @@ def solution(
             print(best_individual)
             print()
 
-        if best_fitness == float("inf"):
+        if best_fitness == 0:
             break
         generation += 1
 
@@ -260,10 +265,16 @@ def get_number_input(path: str, prefix: str = "input") -> str:
 def get_inputs(directory: str = "inputs") -> list[str]:
     if not os.path.isdir(directory):
         raise FileNotFoundError(f"Directory '{directory}' does not exist!")
+
     files = os.listdir(directory)
-    files = list(filter(lambda x: get_number_input(x).isdigit(), files))
-    files.sort(key=lambda x: int(get_number_input(x)))
-    return files
+
+    # sort by number of lines
+    lines = []
+    for file in files:
+        with open(os.path.join(directory, file), "r") as fp:
+            lines.append(sum(1 for _ in fp))
+
+    return [file for _, file in sorted(zip(lines, files))]
 
 
 def prepare_outputs(directory: str = "outputs") -> None:
