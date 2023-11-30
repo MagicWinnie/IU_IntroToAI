@@ -3,8 +3,6 @@ import time
 import os
 import random
 from enum import Enum
-
-# from typing import Callable
 from dataclasses import dataclass
 from matplotlib import pyplot as plt
 
@@ -102,6 +100,8 @@ class Crossword:
         visited = [[False for _ in range(len(grid))] for _ in range(len(grid))]
         dfs(grid, (self.locations[0].x, self.locations[0].y), visited)
 
+        penalty += len(self.locations) - len(set(self.locations))
+
         for _, (word, location) in enumerate(zip(self.words, self.locations)):
             if not visited[location.x][location.y]:
                 min_dist = float("inf")
@@ -153,7 +153,7 @@ class Crossword:
                     if word[i] != grid[location.x][location.y + i]:
                         min_dist = float("inf")
                         for pt in self.letters[word[i]]:
-                            if pt[0] == location.x and pt[1] >= location.y and pt[1] - location.y <= len(word):
+                            if pt[0] == location.x and pt[1] >= location.y and pt[1] <= location.y + len(word) - 1:
                                 continue
                             dist = abs(location.x - pt[0]) + abs(location.y + i - pt[1])
                             if dist < min_dist:
@@ -224,7 +224,7 @@ class Crossword:
                     if word[i] != grid[location.x + i][location.y]:
                         min_dist = float("inf")
                         for pt in self.letters[word[i]]:
-                            if pt[1] == location.y and pt[0] >= location.x and pt[0] - location.x <= len(word):
+                            if pt[1] == location.y and pt[0] >= location.x and pt[0] <= location.x + len(word) - 1:
                                 continue
                             dist = abs(location.x + i - pt[0]) + abs(location.y - pt[1])
                             if dist < min_dist:
@@ -338,7 +338,7 @@ def evolution_step(population: list[Crossword], offsprings_size: int) -> list[Cr
     return new_population
 
 
-def solution(words: list[str], population_size: int = 100, offsprings_size: int = 10) -> tuple[Crossword, int, float]:
+def solution(words: list[str], population_size: int = 100, offsprings_size: int = 30) -> tuple[Crossword, int, float]:
     population = []
     best_fitness = -float("inf")
     for _ in range(5):
