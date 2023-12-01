@@ -1,5 +1,5 @@
 Assignment1/local_tests/
-Assignment2/outputs
+Assignment2/*/*.txt
 
 *.csv
 *.ods
