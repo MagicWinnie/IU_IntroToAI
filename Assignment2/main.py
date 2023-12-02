@@ -3,11 +3,12 @@ import time
 import os
 import random
 from enum import Enum
+from copy import deepcopy
 from dataclasses import dataclass
 from matplotlib import pyplot as plt
 
 
-STATISTICS = True
+WRITE_STATISTICS = True
 
 
 class Direction(int, Enum):
@@ -15,246 +16,161 @@ class Direction(int, Enum):
     VERTICAL = 1
 
 
-@dataclass(unsafe_hash=True)
-class Location:
+@dataclass(unsafe_hash=True, order=True)
+class Point:
     x: int
     y: int
-    direction: Direction
 
     def __str__(self) -> str:
-        return f"{self.x} {self.y} {self.direction.value}"
+        return f"{self.x} {self.y}"
+
+
+@dataclass(unsafe_hash=True)
+class Word:
+    word: str
+    point: Point
+    direction: Direction
+    component: int
+
+    def get_ith_point(self, index: int) -> Point:
+        if index < 0:
+            index = len(self.word) + index
+        if self.direction == Direction.HORIZONTAL:
+            return Point(self.point.x, self.point.y + index)
+        else:
+            return Point(self.point.x + index, self.point.y)
+
+    def intersects(self, other: Word) -> tuple[int, int] | None:
+        if self.direction == other.direction:
+            return None
+        if self.direction == Direction.HORIZONTAL:
+            if (
+                other.point.x <= self.point.x <= other.point.x + len(other.word) - 1
+                and self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
+            ):
+                return other.point.y - self.point.y, self.point.x - other.point.x
+        else:
+            if (
+                self.point.x <= other.point.x <= self.point.x + len(self.word) - 1
+                and other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
+            ):
+                return other.point.x - self.point.x, self.point.y - other.point.y
+        return None
+
+    def parallel_close(self, other: Word) -> int:
+        if self.direction != other.direction:
+            return 0
+        if self.direction == Direction.HORIZONTAL:
+            if abs(self.point.x - other.point.x) > 1:
+                return 0
+            if (
+                self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
+                or other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
+            ):
+                return min(self.point.y + len(self.word) - 1, other.point.y + len(other.word) - 1) - max(
+                    self.point.y, other.point.y
+                )  # + 1
+        else:
+            if abs(self.point.y - other.point.y) > 1:
+                return 0
+            if (
+                self.point.x <= other.point.x <= self.point.x + len(self.word) - 1
+                or other.point.x <= self.point.x <= other.point.x + len(other.word) - 1
+            ):
+                return min(self.point.x + len(self.word) - 1, other.point.x + len(other.word) - 1) - max(
+                    self.point.x, other.point.x
+                )  # + 1
+        return 0
+
+    def intersect_close(self, other: Word) -> bool:
+        if self.direction == other.direction:
+            return False
+        if self.direction == Direction.HORIZONTAL:
+            if other.point.x <= self.point.x <= other.point.x + len(other.word) - 1 and (
+                self.point.y - 1 == other.point.y or other.point.y == self.point.y + len(self.word)
+            ):
+                return True
+            if (other.point.x - 1 == self.point.x or other.point.x + len(other.word) == self.point.x) and (
+                self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
+                or other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
+            ):
+                return True
+        else:
+            if self.point.x <= other.point.x <= self.point.x + len(self.word) - 1 and (
+                other.point.y - 1 == self.point.y or self.point.y == other.point.y + len(other.word)
+            ):
+                return True
+            if (self.point.x - 1 == other.point.x or self.point.x + len(self.word) == other.point.x) and (
+                other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
+                or self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
+            ):
+                return True
+        return False
+
+    def __str__(self) -> str:
+        return f"{self.point} {self.direction.value}"
 
 
 class Crossword:
-    def __init__(self, words: list[str], locations: list[Location] | None = None, N: int = 20):
-        self.words = words
+    def __init__(self, words: list[str], N: int = 20):
         self.N = N
         self.grid_printable: list[list[str]] | None = None
-        self.grid_numbers: list[list[int]] | None = None
-        self.letters: dict[str, list[tuple[int, int]]] = {}
         self.fitness: float | None = None
+        self.components: set[int] = set()
 
-        if locations is None:
-            self.locations = []
-            for word in words:
-                direction = random.choice((Direction.HORIZONTAL, Direction.VERTICAL))
-                self.locations.append(
-                    Location(
-                        random.randint(0, N - 1 - (len(word) if direction == Direction.VERTICAL else 0)),
-                        random.randint(0, N - 1 - (len(word) if direction == Direction.HORIZONTAL else 0)),
-                        direction,
-                    )
-                )
-        else:
-            assert len(words) == len(locations), "Length of `words` should be equal to length of `locations"
-            self.locations = locations
+        self.words: list[Word] = []
+        for i, word in enumerate(words):
+            direction = Direction.HORIZONTAL if random.random() < 0.5 else Direction.VERTICAL
+            dx = len(word) if direction == Direction.VERTICAL else 0
+            dy = len(word) if direction == Direction.HORIZONTAL else 0
+            x0, y0 = random.randint(0, N - 1 - dx), random.randint(0, N - 1 - dy)
+            self.words.append(Word(word, Point(x0, y0), direction, -1))
+            self.components.add(i)
 
     def get_grid_printable(self) -> list[list[str]]:
-        self.grid_printable = [["." for _ in range(self.N)] for _ in range(self.N)]
-        for word, location in zip(self.words, self.locations):
-            for i, char in enumerate(word):
-                if location.direction == Direction.HORIZONTAL:
-                    if 0 <= location.x < self.N and 0 <= location.y + i < self.N:
-                        self.grid_printable[location.x][location.y + i] = char
-                elif location.direction == Direction.VERTICAL:
-                    if 0 <= location.x + i < self.N and 0 <= location.y < self.N:
-                        self.grid_printable[location.x + i][location.y] = char
+        if self.grid_printable is None:
+            self.grid_printable = [["." for _ in range(self.N)] for _ in range(self.N)]
+            for word in self.words:
+                for i in range(len(word.word)):
+                    point = word.get_ith_point(i)
+                    self.grid_printable[point.x][point.y] = word.word[i]
         return self.grid_printable
-
-    def get_grid_numbers(self) -> list[list[int]]:
-        if self.grid_numbers is not None:
-            return self.grid_numbers
-
-        self.letters = {}
-        self.grid_numbers = [[0 for _ in range(self.N)] for _ in range(self.N)]
-        for word, location in zip(self.words, self.locations):
-            for i, _ in enumerate(word):
-                if word[i] not in self.letters:
-                    self.letters[word[i]] = []
-                if location.direction == Direction.HORIZONTAL:
-                    self.letters[word[i]].append((location.x, location.y + i))
-                    if 0 <= location.x < self.N and 0 <= location.y + i < self.N:
-                        if self.grid_numbers[location.x][location.y + i] == 0:
-                            self.grid_numbers[location.x][location.y + i] = 1
-                        else:
-                            self.grid_numbers[location.x][location.y + i] = 3
-                elif location.direction == Direction.VERTICAL:
-                    self.letters[word[i]].append((location.x + i, location.y))
-                    if 0 <= location.x + i < self.N and 0 <= location.y < self.N:
-                        if self.grid_numbers[location.x + i][location.y] == 0:
-                            self.grid_numbers[location.x + i][location.y] = 2
-                        else:
-                            self.grid_numbers[location.x + i][location.y] = 3
-
-        return self.grid_numbers
 
     def get_fitness(self) -> float:
         if self.fitness is not None:
             return self.fitness
 
         penalty = 0
-        grid = self.get_grid_printable()
-        grid_numbers = self.get_grid_numbers()
+        intersections = [False for _ in range(len(self.words))]
+        for i in range(len(self.words)):
+            word1 = self.words[i]
+            for j in range(i + 1, len(self.words)):
+                word2 = self.words[j]
 
-        # check if connected
-        visited = [[False for _ in range(len(grid))] for _ in range(len(grid))]
-        dfs(grid, (self.locations[0].x, self.locations[0].y), visited)
+                intersection = word1.intersects(word2)
+                if intersection:
+                    intersections[i] = True
+                    intersections[j] = True
+                    intersection1, intersection2 = intersection
+                    if word1.word[intersection1] != word2.word[intersection2]:
+                        penalty += 2
 
-        penalty += len(self.locations) - len(set(self.locations))
+                    # if word1.component == word2.component:
+                    #     if word1.component == -1:
+                    #         pass
+                    # elif word1.component == -1:
+                    #     word1.component = word2.component
+                    # elif word2.component == -1:
+                    #     word2.component = word1.component
 
-        for _, (word, location) in enumerate(zip(self.words, self.locations)):
-            if not visited[location.x][location.y]:
-                min_dist = float("inf")
-                for i in range(len(visited)):
-                    for j in range(len(visited)):
-                        if visited[i][j]:
-                            dist = abs(i - location.x) + abs(j - location.y)
-                            if dist < min_dist:
-                                min_dist = dist
-                penalty += min_dist
-            if location.direction == Direction.HORIZONTAL:
-                # words are out of grid
-                if location.y + len(word) - 1 >= self.N:
-                    penalty += 1  # location.y + len(word) - 1 - individual.N
-                # words are surrounded by another word
-                if location.y > 0 and grid[location.x][location.y - 1] != ".":
-                    penalty += 1
-                # words are surrounded by another word
-                if location.y + len(word) < self.N and grid[location.x][location.y + len(word)] != ".":
-                    penalty += 1
-                if (
-                    location.x > 0
-                    and grid[location.x - 1][location.y] != "."
-                    and grid_numbers[location.x - 1][location.y] == 1
-                ):
-                    penalty += 1
-                if (
-                    location.x < self.N - 1
-                    and grid[location.x + 1][location.y] != "."
-                    and grid_numbers[location.x + 1][location.y] == 1
-                ):
-                    penalty += 1
-                if (
-                    location.x > 0
-                    and location.y + len(word) - 1 < self.N
-                    and grid[location.x - 1][location.y + len(word) - 1] != "."
-                    and grid_numbers[location.x - 1][location.y + len(word) - 1] == 1
-                ):
-                    penalty += 1
-                if (
-                    location.x < self.N - 1
-                    and location.y + len(word) - 1 < self.N
-                    and grid[location.x + 1][location.y + len(word) - 1] != "."
-                    and grid_numbers[location.x + 1][location.y + len(word) - 1] == 1
-                ):
-                    penalty += 1
-                count_surrounded = 0
-                for i in range(len(word)):
-                    if word[i] != grid[location.x][location.y + i]:
-                        min_dist = float("inf")
-                        for pt in self.letters[word[i]]:
-                            if pt[0] == location.x and pt[1] >= location.y and pt[1] <= location.y + len(word) - 1:
-                                continue
-                            dist = abs(location.x - pt[0]) + abs(location.y + i - pt[1])
-                            if dist < min_dist:
-                                min_dist = dist
-                        penalty += min_dist
-                    if i < len(word) - 1:
-                        if location.x > 0:
-                            if (
-                                grid[location.x - 1][location.y + i] != "."
-                                and grid[location.x - 1][location.y + i + 1] != "."
-                            ):
-                                penalty += 1
-                            if grid[location.x - 1][location.y + i] != ".":
-                                count_surrounded += 1
-                        if location.x < self.N - 1:
-                            if (
-                                grid[location.x + 1][location.y + i] != "."
-                                and grid[location.x + 1][location.y + i + 1] != "."
-                            ):
-                                penalty += 1
-                            if grid[location.x + 1][location.y + i] != ".":
-                                count_surrounded += 1
-                    else:
-                        if location.x > 0 and grid[location.x - 1][location.y + i] != ".":
-                            count_surrounded += 1
-                        if location.x < self.N - 1 and grid[location.x + 1][location.y + i] != ".":
-                            count_surrounded += 1
-                if count_surrounded == 0:
-                    penalty += 1
-            elif location.direction == Direction.VERTICAL:
-                # words are out of grid
-                if location.x + len(word) - 1 >= self.N:
-                    penalty += 1  # location.x + len(word) - 1 - individual.N
-                # words are surrounded by another word
-                if location.x > 0 and grid[location.x - 1][location.y] != ".":
-                    penalty += 1
-                # words are surrounded by another word
-                if location.x + len(word) < self.N and grid[location.x + len(word)][location.y] != ".":
-                    penalty += 1
-                if (
-                    location.y > 0
-                    and grid[location.x][location.y - 1] != "."
-                    and grid_numbers[location.x][location.y - 1] == 2
-                ):
-                    penalty += 1
-                if (
-                    location.y < self.N - 1
-                    and grid[location.x][location.y + 1] != "."
-                    and grid_numbers[location.x][location.y + 1] == 2
-                ):
-                    penalty += 1
-                if (
-                    location.y > 0
-                    and location.x + len(word) - 1 < self.N
-                    and grid[location.x + len(word) - 1][location.y - 1] != "."
-                    and grid_numbers[location.x + len(word) - 1][location.y - 1] == 1
-                ):
-                    penalty += 1
-                if (
-                    location.y < self.N - 1
-                    and location.x + len(word) - 1 < self.N
-                    and grid[location.x + len(word) - 1][location.y + 1] != "."
-                    and grid_numbers[location.x + len(word) - 1][location.y + 1] == 1
-                ):
-                    penalty += 1
-                count_surrounded = 0
-                for i in range(len(word)):
-                    if word[i] != grid[location.x + i][location.y]:
-                        min_dist = float("inf")
-                        for pt in self.letters[word[i]]:
-                            if pt[1] == location.y and pt[0] >= location.x and pt[0] <= location.x + len(word) - 1:
-                                continue
-                            dist = abs(location.x + i - pt[0]) + abs(location.y - pt[1])
-                            if dist < min_dist:
-                                min_dist = dist
-                        penalty += min_dist
-                    if i < len(word) - 1:
-                        if location.y > 0:
-                            if (
-                                grid[location.x + i][location.y - 1] != "."
-                                and grid[location.x + i + 1][location.y - 1] != "."
-                            ):
-                                penalty += 1
-                            if grid[location.x + i][location.y - 1] != ".":
-                                count_surrounded += 1
-                        if location.y < self.N - 1:
-                            if (
-                                grid[location.x + i][location.y + 1] != "."
-                                and grid[location.x + i + 1][location.y + 1] != "."
-                            ):
-                                penalty += 1
-                            if grid[location.x + i][location.y + 1] != ".":
-                                count_surrounded += 1
-                    else:
-                        if location.y > 0 and grid[location.x + i][location.y - 1] != ".":
-                            count_surrounded += 1
-                        if location.y < self.N - 1 and grid[location.x + i][location.y - 1] != ".":
-                            count_surrounded += 1
-                if count_surrounded == 0:
-                    penalty += 1
+                penalty += word1.parallel_close(word2)
 
+                intersection_close = word1.intersect_close(word2)
+                if intersection_close:
+                    penalty += 1
+        for intersection in intersections:
+            if not intersection:
+                penalty += 1
         return -penalty
 
     def __str__(self) -> str:
@@ -263,28 +179,6 @@ class Crossword:
         for row in grid:
             string += " ".join(row) + "\n"
         return string[:-1]
-
-
-def dfs(grid: list[list[str]], start: tuple[int, int], visited: list[list[bool]]) -> None:
-    def neighbours(point):
-        candidates = [
-            (point[0] - 1, point[1]),
-            (point[0] + 1, point[1]),
-            (point[0], point[1] - 1),
-            (point[0], point[1] + 1),
-        ]
-        return [
-            c
-            for c in candidates
-            if c[0] >= 0 and c[0] < len(grid) and c[1] >= 0 and c[1] < len(grid) and grid[c[0]][c[1]] != "."
-        ]
-
-    frontier = [start]
-
-    while not len(frontier) == 0:
-        element = frontier.pop()
-        visited[element[0]][element[1]] = True
-        frontier.extend([n for n in neighbours(element) if visited[n[0]][n[1]] is False])
 
 
 def initial_population(words: list[str], population_size: int) -> list[Crossword]:
@@ -307,32 +201,47 @@ def get_parents(population: list[Crossword], offsprings_size: int) -> tuple[list
 
 
 def cross(mother: Crossword, father: Crossword) -> Crossword:
-    locations = []
-    for i in range(len(mother.locations)):
-        locations.append(random.choice((mother.locations[i], father.locations[i])))
-    return Crossword(mother.words, locations)
+    crossword = deepcopy(mother)
+    # ind = random.randint(0, len(mother.locations) - 1)
+    # for i in range(ind):
+    #     locations.append(mother.locations[i])
+    # for i in range(ind, len(mother.locations)):
+    #     locations.append(father.locations[i])
+
+    for i in range(len(mother.words)):
+        if random.random() < 0.5:
+            crossword.words[i].point = mother.words[i].point
+            crossword.words[i].direction = mother.words[i].direction
+            crossword.words[i].component = mother.words[i].component
+        else:
+            crossword.words[i].point = father.words[i].point
+            crossword.words[i].direction = father.words[i].direction
+            crossword.words[i].component = father.words[i].component
+    return crossword
 
 
-def mutate(offspring: Crossword) -> Crossword:
-    indices = random.sample(range(len(offspring.locations)), len(offspring.locations) // 3)
-    for i in indices:
-        direction = random.choice((Direction.HORIZONTAL, Direction.VERTICAL))
-        offspring.locations[i] = Location(
-            random.randint(0, offspring.N - 1 - (len(offspring.words[i]) if direction == Direction.VERTICAL else 0)),
-            random.randint(0, offspring.N - 1 - (len(offspring.words[i]) if direction == Direction.HORIZONTAL else 0)),
-            direction,
-        )
+def mutate(offspring: Crossword, probability) -> Crossword:
+    for i in range(len(offspring.words)):
+        if random.random() < probability:
+            direction = Direction.HORIZONTAL if random.random() < 0.5 else Direction.VERTICAL
+            dx = len(offspring.words[i].word) if direction == Direction.VERTICAL else 0
+            dy = len(offspring.words[i].word) if direction == Direction.HORIZONTAL else 0
+            x0, y0 = random.randint(0, offspring.N - 1 - dx), random.randint(0, offspring.N - 1 - dy)
+
+            offspring.words[i].point = Point(x0, y0)
+            offspring.words[i].direction = direction
+            offspring.words[i].component = -1
     offspring.grid_printable = None
-    offspring.grid_numbers = None
+    offspring.fitness = None
     return offspring
 
 
-def evolution_step(population: list[Crossword], offsprings_size: int) -> list[Crossword]:
+def evolution_step(population: list[Crossword], offsprings_size: int, mutation_rate: float = 0.4) -> list[Crossword]:
     mothers, fathers = get_parents(population, offsprings_size)
     offsprings = []
 
     for mother, father in zip(mothers, fathers):
-        offsprings.append(mutate(cross(mother, father)))
+        offsprings.append(mutate(cross(mother, father), mutation_rate))
 
     new_population = replace_population(population, offsprings)
     return new_population
@@ -352,10 +261,23 @@ def solution(words: list[str], population_size: int = 100, offsprings_size: int 
     fitness_change: list[float] = []
     generation = 0
 
+    # same_fitness = 0
+    # same_threshold = 800
+    # last_fitness = float("inf")
     while True:
         population = evolution_step(population, offsprings_size)
         best_individual = population[-1]
         best_fitness = best_individual.get_fitness()
+        # if last_fitness != float("inf"):
+        #     if best_fitness == last_fitness:
+        #         same_fitness += 1
+        #     else:
+        #         same_fitness = 0
+        # if same_fitness >= same_threshold:
+        #     population = initial_population(words, population_size)
+        #     same_fitness = 0
+        # last_fitness = best_fitness
+
         fitness_change.append(best_fitness)
 
         if generation % 100 == 0:
@@ -417,14 +339,14 @@ def read_words(path: str) -> list[str]:
     return words
 
 
-def main(inputs_dir: str = "inputs", outputs_dir: str = "outputs") -> None:
+def main(inputs_dir: str = "__inputs", outputs_dir: str = "outputs") -> None:
     files = get_inputs(inputs_dir)
     prepare_outputs(outputs_dir)
 
     stat = None
-    if STATISTICS:
+    if WRITE_STATISTICS:
         stat = open("statistics.csv", "w")
-        stat.write("test,time,generation,fitness\n")
+        stat.write("test,time,generation,fitness,words\n")
     for file in files:
         words = read_words(os.path.join(inputs_dir, file))
 
@@ -433,17 +355,15 @@ def main(inputs_dir: str = "inputs", outputs_dir: str = "outputs") -> None:
             crossword, generation, best_fitness = solution(words)
         except KeyboardInterrupt:
             break
-        except Exception:
-            continue
         end_time = time.time()
 
         with open(os.path.join(outputs_dir, file.replace("input", "output")), "w") as fp:
-            for location in crossword.locations:
-                fp.write(str(location) + "\n")
+            for word in crossword.words:
+                fp.write(str(word) + "\n")
 
-        if STATISTICS and stat:
-            stat.write(f"{file},{end_time-start_time},{generation},{best_fitness}\n")
-    if STATISTICS and stat:
+        if WRITE_STATISTICS and stat:
+            stat.write(f"{file},{end_time-start_time},{generation},{best_fitness},{len(words)}\n")
+    if WRITE_STATISTICS and stat:
         stat.close()
 
 
