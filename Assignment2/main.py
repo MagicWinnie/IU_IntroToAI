@@ -8,6 +8,9 @@ from dataclasses import dataclass
 from matplotlib import pyplot as plt
 
 
+# random.seed(44)
+
+
 WRITE_STATISTICS = True
 
 
@@ -63,23 +66,31 @@ class Word:
         if self.direction == Direction.HORIZONTAL:
             if abs(self.point.x - other.point.x) > 1:
                 return 0
+            if self.point.x == other.point.x and (
+                other.point.y + len(other.word) >= self.point.y or self.point.y + len(self.word) >= other.point.y
+            ):
+                return 1
             if (
                 self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
                 or other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
             ):
                 return min(self.point.y + len(self.word) - 1, other.point.y + len(other.word) - 1) - max(
                     self.point.y, other.point.y
-                )  # + 1
+                )
         else:
             if abs(self.point.y - other.point.y) > 1:
                 return 0
+            if self.point.y == other.point.y and (
+                other.point.x + len(other.word) >= self.point.x or self.point.x + len(self.word) >= other.point.x
+            ):
+                return 1
             if (
                 self.point.x <= other.point.x <= self.point.x + len(self.word) - 1
                 or other.point.x <= self.point.x <= other.point.x + len(other.word) - 1
             ):
                 return min(self.point.x + len(self.word) - 1, other.point.x + len(other.word) - 1) - max(
                     self.point.x, other.point.x
-                )  # + 1
+                )
         return 0
 
     def intersect_close(self, other: Word) -> bool:
@@ -90,21 +101,21 @@ class Word:
                 self.point.y - 1 == other.point.y or other.point.y == self.point.y + len(self.word)
             ):
                 return True
-            if (other.point.x - 1 == self.point.x or other.point.x + len(other.word) == self.point.x) and (
-                self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
-                or other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
-            ):
-                return True
+            # if (other.point.x - 1 == self.point.x or other.point.x + len(other.word) == self.point.x) and (
+            #     self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
+            #     or other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
+            # ):
+            #     return True
         else:
             if self.point.x <= other.point.x <= self.point.x + len(self.word) - 1 and (
                 other.point.y - 1 == self.point.y or self.point.y == other.point.y + len(other.word)
             ):
                 return True
-            if (self.point.x - 1 == other.point.x or self.point.x + len(self.word) == other.point.x) and (
-                other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
-                or self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
-            ):
-                return True
+            # if (self.point.x - 1 == other.point.x or self.point.x + len(self.word) == other.point.x) and (
+            #     other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
+            #     or self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
+            # ):
+            #     return True
         return False
 
     def __str__(self) -> str:
@@ -124,7 +135,7 @@ class Crossword:
             dx = len(word) if direction == Direction.VERTICAL else 0
             dy = len(word) if direction == Direction.HORIZONTAL else 0
             x0, y0 = random.randint(0, N - 1 - dx), random.randint(0, N - 1 - dy)
-            self.words.append(Word(word, Point(x0, y0), direction, -1))
+            self.words.append(Word(word, Point(x0, y0), direction, i))
             self.components.add(i)
 
     def get_grid_printable(self) -> list[list[str]]:
@@ -155,13 +166,14 @@ class Crossword:
                     if word1.word[intersection1] != word2.word[intersection2]:
                         penalty += 2
 
-                    # if word1.component == word2.component:
-                    #     if word1.component == -1:
-                    #         pass
-                    # elif word1.component == -1:
-                    #     word1.component = word2.component
-                    # elif word2.component == -1:
-                    #     word2.component = word1.component
+                    if word1.component != word2.component:
+                        if word1.component in self.components and word2.component in self.components:
+                            self.components.discard(word1.component)
+                            word1.component = word2.component
+                        elif word1.component in self.components and word2.component not in self.components:
+                            word2.component = word1.component
+                        else:
+                            word1.component = word2.component
 
                 penalty += word1.parallel_close(word2)
 
@@ -171,6 +183,7 @@ class Crossword:
         for intersection in intersections:
             if not intersection:
                 penalty += 1
+        penalty += len(self.components) - 1
         return -penalty
 
     def __str__(self) -> str:
@@ -202,6 +215,8 @@ def get_parents(population: list[Crossword], offsprings_size: int) -> tuple[list
 
 def cross(mother: Crossword, father: Crossword) -> Crossword:
     crossword = deepcopy(mother)
+    crossword.fitness = None
+    crossword.components = set()
     # ind = random.randint(0, len(mother.locations) - 1)
     # for i in range(ind):
     #     locations.append(mother.locations[i])
@@ -217,10 +232,12 @@ def cross(mother: Crossword, father: Crossword) -> Crossword:
             crossword.words[i].point = father.words[i].point
             crossword.words[i].direction = father.words[i].direction
             crossword.words[i].component = father.words[i].component
+        crossword.components.add(i)
     return crossword
 
 
 def mutate(offspring: Crossword, probability) -> Crossword:
+    offspring.components = set()
     for i in range(len(offspring.words)):
         if random.random() < probability:
             direction = Direction.HORIZONTAL if random.random() < 0.5 else Direction.VERTICAL
@@ -230,7 +247,9 @@ def mutate(offspring: Crossword, probability) -> Crossword:
 
             offspring.words[i].point = Point(x0, y0)
             offspring.words[i].direction = direction
-            offspring.words[i].component = -1
+        offspring.words[i].component = i
+        offspring.components.add(i)
+
     offspring.grid_printable = None
     offspring.fitness = None
     return offspring
@@ -339,7 +358,7 @@ def read_words(path: str) -> list[str]:
     return words
 
 
-def main(inputs_dir: str = "__inputs", outputs_dir: str = "outputs") -> None:
+def main(inputs_dir: str = "vlad", outputs_dir: str = "outputs") -> None:
     files = get_inputs(inputs_dir)
     prepare_outputs(outputs_dir)
 
