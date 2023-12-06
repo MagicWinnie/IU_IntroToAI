@@ -466,7 +466,9 @@ def evolution_step(population: list[Crossword], offsprings_size: int, mutation_r
     return new_population
 
 
-def solution(words: list[str], population_size: int = 100, offsprings_size: int = 40) -> tuple[Crossword, int, float]:
+def solution(
+    words: list[str], start_time: float, population_size: int = 100, offsprings_size: int = 40
+) -> tuple[Crossword, int, float]:
     """The main function of the solution.
     It generates an initial population, runs evolution until a valid crossword
     is generated (fitness value = 0, as there is no penalty).
@@ -476,6 +478,7 @@ def solution(words: list[str], population_size: int = 100, offsprings_size: int 
 
     Args:
         words (list[str]): List of words
+        start_time (float): Time of starting the execution of solution
         population_size (int, optional): Size of the population. Defaults to 100.
         offsprings_size (int, optional): Size of parents. Defaults to 40.
 
@@ -527,6 +530,9 @@ def solution(words: list[str], population_size: int = 100, offsprings_size: int 
 
         # condition on exiting evolution
         if best_fitness == 0:
+            break
+        # condition on time limit
+        if time.time() - start_time >= 5 * 60:
             break
         generation += 1
 
@@ -645,16 +651,19 @@ def main(inputs_dir: str = "gleb", outputs_dir: str = "outputs") -> None:
 
         # check the start time and execute the solution
         start_time = time.time()
+        crossword, generation, best_fitness = None, -1, -1
         try:
-            crossword, generation, best_fitness = solution(words)
-        except KeyboardInterrupt:
-            break
+            crossword, generation, best_fitness = solution(words, start_time)
+        except Exception as e:
+            print(f"[ERROR] Unexpected error while running test: {file}:")
+            print(e)
         end_time = time.time()
 
         # write to output file
         with open(os.path.join(outputs_dir, file.replace("input", "output")), "w") as fp:
-            for word in crossword.words:
-                fp.write(str(word) + "\n")
+            if type(crossword) is Crossword:
+                for word in crossword.words:
+                    fp.write(str(word) + "\n")
 
         # write to statistics file if needed
         if WRITE_STATISTICS and stat:
