@@ -150,7 +150,7 @@ class Word:
                     min(self.point.y + len(self.word) - 1, other.point.y + len(other.word) - 1)
                     - max(self.point.y, other.point.y)
                 )
-                return delta
+                return delta + 1
             # check for "overlapping" words in adjacent rows
             elif (
                 self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
@@ -160,6 +160,8 @@ class Word:
                 delta = min(self.point.y + len(self.word) - 1, other.point.y + len(other.word) - 1) - max(
                     self.point.y, other.point.y
                 )
+                if delta == 0:
+                    return -1
                 return delta
         else:
             # and these words should be close to each other
@@ -175,7 +177,7 @@ class Word:
                     min(self.point.x + len(self.word) - 1, other.point.x + len(other.word) - 1)
                     - max(self.point.x, other.point.x)
                 )
-                return delta
+                return delta + 1
             # check for "overlapping" words in adjacent columns
             elif (
                 self.point.x <= other.point.x <= self.point.x + len(self.word) - 1
@@ -185,6 +187,8 @@ class Word:
                 delta = min(self.point.x + len(self.word) - 1, other.point.x + len(other.word) - 1) - max(
                     self.point.x, other.point.x
                 )
+                if delta == 0:
+                    return -1
                 return delta
         # everything is fine
         return 0
@@ -285,6 +289,9 @@ class Crossword:
         if self.fitness is not None:
             return self.fitness
 
+        intersections: dict[int, set[int]] = {i: set() for i in range(len(self.words))}
+        possible_does_not_cross: set[tuple[int, int]] = set()
+
         penalty = 0
         for i in range(len(self.words)):
             word1 = self.words[i]
@@ -295,6 +302,10 @@ class Crossword:
                 intersection = word1.intersects(word2)
                 if intersection:
                     intersection1, intersection2 = intersection
+
+                    intersections[i].add(j)
+                    intersections[j].add(i)
+
                     # whether two words intersect at the same character
                     if word1.word[intersection1] != word2.word[intersection2]:
                         penalty += abs(ord(word1.word[intersection1]) - ord(word2.word[intersection2]))  # 3
@@ -313,7 +324,11 @@ class Crossword:
                             word1.component = word2.component
 
                 # whether two parallel words are not located too close
-                penalty += word1.parallel_close(word2) * 8
+                parallel_close = word1.parallel_close(word2)
+                if parallel_close == -1:
+                    possible_does_not_cross.add((i, j))
+                else:
+                    penalty += parallel_close * 8
 
                 # whether two perpendicular words are not located too close
                 if word1.intersect_close(word2):
@@ -321,6 +336,10 @@ class Crossword:
 
         # whether the words are in one component
         penalty += (sum(self.components) - 1) * 12
+
+        for possible1, possible2 in possible_does_not_cross:
+            if not intersections[possible1].intersection(intersections[possible2]):
+                penalty += 1
 
         return -penalty
 
@@ -577,7 +596,7 @@ def solution(
         if best_fitness == 0:
             break
         # condition on time limit
-        if time.time() - start_time >= 5 * 60:
+        if time.time() - start_time >= 4.9 * 60:
             break
         generation += 1
 
