@@ -691,7 +691,7 @@ def read_words(path: str) -> list[str]:
     return words
 
 
-def main(inputs_dir: str = "inputs", outputs_dir: str = "outputs") -> None:
+def main(inputs_dir: str = "gleb", outputs_dir: str = "outputs") -> None:
     """The main function of the program that reads the input files from `inputs_dir`
     runs the solution on a test, and writes the output with solution to `outputs_dir`.
 
@@ -711,7 +711,7 @@ def main(inputs_dir: str = "inputs", outputs_dir: str = "outputs") -> None:
     # open the statistics file if needed
     stat = None
     if WRITE_STATISTICS:
-        stat = open("statistics.csv", "w")
+        stat = open(os.path.join(__location__, "statistics.csv"), "w")
         stat.write("test,time,generation,fitness,words\n")
 
     for file in files:
