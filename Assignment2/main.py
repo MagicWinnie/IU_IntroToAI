@@ -422,6 +422,17 @@ def solution(words: list[str], population_size: int = 100, offsprings_size: int 
 
 
 def get_number_input(path: str, prefix: str = "input") -> str:
+    """Get the number of the test from the file name.
+    If the input file is not named in the following way: <prefix>N.txt,
+    the function will return whatever is between prefix and file type.
+
+    Args:
+        path (str): Path to input file
+        prefix (str, optional): What prefix is used in file names. Defaults to "input".
+
+    Returns:
+        str: Number of the test from the file name
+    """
     file_name = os.path.basename(path)
     file_name = os.path.splitext(file_name)[0]
     file_name = file_name.replace(prefix, "")
@@ -429,26 +440,51 @@ def get_number_input(path: str, prefix: str = "input") -> str:
 
 
 def get_inputs(directory: str = "inputs") -> list[str]:
+    """Return list of input file names sorted by number of lines in them.
+
+    Args:
+        directory (str, optional): Path to the input directory. Defaults to "inputs".
+
+    Raises:
+        FileNotFoundError: The directory does not exist
+
+    Returns:
+        list[str]: File names
+    """
     if not os.path.isdir(directory):
         raise FileNotFoundError(f"Directory '{directory}' does not exist!")
 
     files = os.listdir(directory)
 
-    # sort by number of lines
+    # count number of lines
     lines = []
     for file in files:
         with open(os.path.join(directory, file), "r") as fp:
             lines.append(sum(1 for _ in fp))
 
+    # sort by number of lines
     return [file for _, file in sorted(zip(lines, files))]
 
 
 def prepare_outputs(directory: str = "outputs") -> None:
+    """Create output directory if it does not exist.
+
+    Args:
+        directory (str, optional): Path to the output directory. Defaults to "outputs".
+    """
     if not os.path.isdir(directory):
         os.mkdir(directory)
 
 
 def read_words(path: str) -> list[str]:
+    """Read words from a file.
+
+    Args:
+        path (str): Path to the file
+
+    Returns:
+        list[str]: List of the words from the file
+    """
     with open(path, "r") as fp:
         words = fp.readlines()
     words = list(map(str.strip, words))
