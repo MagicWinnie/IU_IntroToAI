@@ -3,39 +3,83 @@ import time
 import os
 import random
 from enum import Enum
-from copy import deepcopy
 from dataclasses import dataclass
-from matplotlib import pyplot as plt
 
 
-# random.seed(44)
-
-
+# whether to print and write to file info related to statistics:
+#     * printing info about generation
+#     * plotting the fitness change
+#     * write execution time to file
 WRITE_STATISTICS = True
+# we need matplotlib to plot
+if WRITE_STATISTICS:
+    from matplotlib import pyplot as plt
+
+# get path to our script, so it could find `inputs` wherever it was launched
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+
+def randint(a: int, b: int) -> int:
+    """Returns a random integer in a range.
+    Works faster than the `random.randint`.
+
+    Args:
+        a (int): lower bound of the range
+        b (int): upper bound of the range
+
+    Returns:
+        int: a random integer in range [a; b]
+    """
+    return a + int(b * random.random())
 
 
 class Direction(int, Enum):
+    """Enumerator for storing the direction of a word."""
+
     HORIZONTAL = 0
     VERTICAL = 1
 
 
 @dataclass(unsafe_hash=True, order=True)
 class Point:
+    """Dataclass to store coordinates of a word."""
+
     x: int
     y: int
 
     def __str__(self) -> str:
+        """Returns string representation for output file.
+
+        Returns:
+            str: String in format: <x> <y>
+        """
         return f"{self.x} {self.y}"
 
 
 @dataclass(unsafe_hash=True)
 class Word:
+    """Dataclass to store information about a word:
+    * word itself
+    * its location of the first letter
+    * words' direction
+    * which component of a graph it belongs to
+    """
+
     word: str
     point: Point
     direction: Direction
     component: int
 
     def get_ith_point(self, index: int) -> Point:
+        """Returns the location of i-th character of the word.
+        If index is negative, the location is returned from the back.
+
+        Args:
+            index (int): index of the character
+
+        Returns:
+            Point: Location of this character
+        """
         if index < 0:
             index = len(self.word) + index
         if self.direction == Direction.HORIZONTAL:
@@ -44,20 +88,37 @@ class Word:
             return Point(self.point.x + index, self.point.y)
 
     def intersects(self, other: Word) -> tuple[int, int] | None:
+        """If two words intersect, it returns the indicies of characters, where they intersect.
+        Otherwise None is returned.
+
+        Args:
+            other (Word): Another word to check with
+
+        Returns:
+            tuple[int, int] | None: None if words do not intersect, otherwise indices of there intersection
+        """
+        # here we check only words that are perpendicular
         if self.direction == other.direction:
             return None
         if self.direction == Direction.HORIZONTAL:
+            # check that x coordinate of the first word (horizontal) is located between
+            # the x coordinates of the second word (vertical)
+            # And that y coordinate of the second word (vertical) is located between
+            # the y coordinates of the first word (horizontal)
             if (
                 other.point.x <= self.point.x <= other.point.x + len(other.word) - 1
                 and self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
             ):
                 return other.point.y - self.point.y, self.point.x - other.point.x
         else:
+            # we check the same thing as in the first condition, but the first and
+            # the second words are swapped, due to the first word being vertical
             if (
                 self.point.x <= other.point.x <= self.point.x + len(self.word) - 1
                 and other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
             ):
                 return other.point.x - self.point.x, self.point.y - other.point.y
+        # two words are perpendicular but do not intersect
         return None
 
     def parallel_close(self, other: Word) -> int:
@@ -67,30 +128,42 @@ class Word:
             if abs(self.point.x - other.point.x) > 1:
                 return 0
             if self.point.x == other.point.x and (
-                other.point.y + len(other.word) >= self.point.y or self.point.y + len(self.word) >= other.point.y
+                self.point.y + len(self.word) - 1 >= other.point.y + len(other.word) - 1 >= self.point.y - 1
+                or other.point.y + len(other.word) - 1 >= self.point.y + len(self.word) - 1 >= other.point.y - 1
             ):
-                return 1
-            if (
+                delta = abs(
+                    min(self.point.y + len(self.word) - 1, other.point.y + len(other.word) - 1)
+                    - max(self.point.y, other.point.y)
+                )
+                return delta
+            elif (
                 self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
                 or other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
             ):
-                return min(self.point.y + len(self.word) - 1, other.point.y + len(other.word) - 1) - max(
+                delta = min(self.point.y + len(self.word) - 1, other.point.y + len(other.word) - 1) - max(
                     self.point.y, other.point.y
                 )
+                return delta
         else:
             if abs(self.point.y - other.point.y) > 1:
                 return 0
             if self.point.y == other.point.y and (
-                other.point.x + len(other.word) >= self.point.x or self.point.x + len(self.word) >= other.point.x
+                self.point.x + len(self.word) - 1 >= other.point.x + len(other.word) - 1 >= self.point.x - 1
+                or other.point.x + len(other.word) - 1 >= self.point.x + len(self.word) - 1 >= other.point.x - 1
             ):
-                return 1
-            if (
+                delta = abs(
+                    min(self.point.x + len(self.word) - 1, other.point.x + len(other.word) - 1)
+                    - max(self.point.x, other.point.x)
+                )
+                return delta
+            elif (
                 self.point.x <= other.point.x <= self.point.x + len(self.word) - 1
                 or other.point.x <= self.point.x <= other.point.x + len(other.word) - 1
             ):
-                return min(self.point.x + len(self.word) - 1, other.point.x + len(other.word) - 1) - max(
+                delta = min(self.point.x + len(self.word) - 1, other.point.x + len(other.word) - 1) - max(
                     self.point.x, other.point.x
                 )
+                return delta
         return 0
 
     def intersect_close(self, other: Word) -> bool:
@@ -101,21 +174,21 @@ class Word:
                 self.point.y - 1 == other.point.y or other.point.y == self.point.y + len(self.word)
             ):
                 return True
-            # if (other.point.x - 1 == self.point.x or other.point.x + len(other.word) == self.point.x) and (
-            #     self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
-            #     or other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
-            # ):
-            #     return True
+            if (other.point.x - 1 == self.point.x or other.point.x + len(other.word) == self.point.x) and (
+                self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
+                or other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
+            ):
+                return True
         else:
             if self.point.x <= other.point.x <= self.point.x + len(self.word) - 1 and (
                 other.point.y - 1 == self.point.y or self.point.y == other.point.y + len(other.word)
             ):
                 return True
-            # if (self.point.x - 1 == other.point.x or self.point.x + len(self.word) == other.point.x) and (
-            #     other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
-            #     or self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
-            # ):
-            #     return True
+            if (self.point.x - 1 == other.point.x or self.point.x + len(self.word) == other.point.x) and (
+                other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
+                or self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
+            ):
+                return True
         return False
 
     def __str__(self) -> str:
@@ -125,27 +198,17 @@ class Word:
 class Crossword:
     def __init__(self, words: list[str], N: int = 20):
         self.N = N
-        self.grid_printable: list[list[str]] | None = None
         self.fitness: float | None = None
-        self.components: set[int] = set()
+        self.components: list[bool] = [False] * len(words)
 
         self.words: list[Word] = []
         for i, word in enumerate(words):
             direction = Direction.HORIZONTAL if random.random() < 0.5 else Direction.VERTICAL
             dx = len(word) if direction == Direction.VERTICAL else 0
             dy = len(word) if direction == Direction.HORIZONTAL else 0
-            x0, y0 = random.randint(0, N - 1 - dx), random.randint(0, N - 1 - dy)
+            x0, y0 = randint(0, N - 1 - dx), randint(0, N - 1 - dy)
             self.words.append(Word(word, Point(x0, y0), direction, i))
-            self.components.add(i)
-
-    def get_grid_printable(self) -> list[list[str]]:
-        if self.grid_printable is None:
-            self.grid_printable = [["." for _ in range(self.N)] for _ in range(self.N)]
-            for word in self.words:
-                for i in range(len(word.word)):
-                    point = word.get_ith_point(i)
-                    self.grid_printable[point.x][point.y] = word.word[i]
-        return self.grid_printable
+            self.components[i] = True
 
     def get_fitness(self) -> float:
         if self.fitness is not None:
@@ -164,33 +227,42 @@ class Crossword:
                     intersections[j] = True
                     intersection1, intersection2 = intersection
                     if word1.word[intersection1] != word2.word[intersection2]:
-                        penalty += 2
+                        penalty += abs(ord(word1.word[intersection1]) - ord(word2.word[intersection2]))  # 3
 
                     if word1.component != word2.component:
-                        if word1.component in self.components and word2.component in self.components:
-                            self.components.discard(word1.component)
+                        if self.components[word1.component] and self.components[word2.component]:
+                            self.components[word1.component] = False
                             word1.component = word2.component
-                        elif word1.component in self.components and word2.component not in self.components:
+                        elif self.components[word1.component] and not self.components[word2.component]:
                             word2.component = word1.component
                         else:
                             word1.component = word2.component
 
-                penalty += word1.parallel_close(word2)
+                penalty += word1.parallel_close(word2) * 8
 
-                intersection_close = word1.intersect_close(word2)
-                if intersection_close:
-                    penalty += 1
-        for intersection in intersections:
-            if not intersection:
-                penalty += 1
-        penalty += len(self.components) - 1
+                if word1.intersect_close(word2):
+                    penalty += 30
+        penalty += (sum(self.components) - 1) * 12
         return -penalty
 
     def __str__(self) -> str:
-        grid = self.get_grid_printable()
+        """Returns a string (grid-like) representation of the crossword.
+
+        Returns:
+            str: Grid-like representation of the crossword.
+        """
+
+        grid = [["." for _ in range(self.N)] for _ in range(self.N)]
+        for word in self.words:
+            for i in range(len(word.word)):
+                point = word.get_ith_point(i)
+                grid[point.x][point.y] = word.word[i]
+
         string = ""
         for row in grid:
             string += " ".join(row) + "\n"
+
+        # remove the last new-line symbol
         return string[:-1]
 
 
@@ -214,43 +286,65 @@ def get_parents(population: list[Crossword], offsprings_size: int) -> tuple[list
 
 
 def cross(mother: Crossword, father: Crossword) -> Crossword:
-    crossword = deepcopy(mother)
+    crossword = Crossword([])
     crossword.fitness = None
-    crossword.components = set()
-    # ind = random.randint(0, len(mother.locations) - 1)
-    # for i in range(ind):
-    #     locations.append(mother.locations[i])
-    # for i in range(ind, len(mother.locations)):
-    #     locations.append(father.locations[i])
+    crossword.components = [False] * len(mother.words)
 
-    for i in range(len(mother.words)):
-        if random.random() < 0.5:
-            crossword.words[i].point = mother.words[i].point
-            crossword.words[i].direction = mother.words[i].direction
-            crossword.words[i].component = mother.words[i].component
-        else:
-            crossword.words[i].point = father.words[i].point
-            crossword.words[i].direction = father.words[i].direction
-            crossword.words[i].component = father.words[i].component
-        crossword.components.add(i)
+    index = randint(0, len(mother.words) - 1)
+    for i in range(0, index):
+        word = Word(
+            mother.words[i].word,
+            mother.words[i].point,
+            mother.words[i].direction,
+            mother.words[i].component,
+        )
+        crossword.words.append(word)
+        crossword.components[i] = True
+    for i in range(index, len(mother.words)):
+        word = Word(
+            father.words[i].word,
+            father.words[i].point,
+            father.words[i].direction,
+            father.words[i].component,
+        )
+        crossword.words.append(word)
+        crossword.components[i] = True
+
+    # for i in range(len(mother.words)):
+    #     if random.random() < 0.5:
+    #         word = Word(
+    #             mother.words[i].word,
+    #             mother.words[i].point,
+    #             mother.words[i].direction,
+    #             mother.words[i].component,
+    #         )
+    #     else:
+    #         word = Word(
+    #             father.words[i].word,
+    #             father.words[i].point,
+    #             father.words[i].direction,
+    #             father.words[i].component,
+    #         )
+    #     crossword.words.append(word)
+    #     crossword.components[i] = True
+
     return crossword
 
 
 def mutate(offspring: Crossword, probability) -> Crossword:
-    offspring.components = set()
+    offspring.components = [False] * len(offspring.words)
     for i in range(len(offspring.words)):
         if random.random() < probability:
             direction = Direction.HORIZONTAL if random.random() < 0.5 else Direction.VERTICAL
             dx = len(offspring.words[i].word) if direction == Direction.VERTICAL else 0
             dy = len(offspring.words[i].word) if direction == Direction.HORIZONTAL else 0
-            x0, y0 = random.randint(0, offspring.N - 1 - dx), random.randint(0, offspring.N - 1 - dy)
+            x0, y0 = randint(0, offspring.N - 1 - dx), randint(0, offspring.N - 1 - dy)
 
             offspring.words[i].point = Point(x0, y0)
             offspring.words[i].direction = direction
         offspring.words[i].component = i
-        offspring.components.add(i)
+        offspring.components[i] = True
 
-    offspring.grid_printable = None
     offspring.fitness = None
     return offspring
 
@@ -266,7 +360,7 @@ def evolution_step(population: list[Crossword], offsprings_size: int, mutation_r
     return new_population
 
 
-def solution(words: list[str], population_size: int = 100, offsprings_size: int = 30) -> tuple[Crossword, int, float]:
+def solution(words: list[str], population_size: int = 100, offsprings_size: int = 40) -> tuple[Crossword, int, float]:
     population = []
     best_fitness = -float("inf")
     for _ in range(5):
@@ -280,26 +374,27 @@ def solution(words: list[str], population_size: int = 100, offsprings_size: int 
     fitness_change: list[float] = []
     generation = 0
 
-    # same_fitness = 0
-    # same_threshold = 800
-    # last_fitness = float("inf")
+    same_fitness = 0
+    same_threshold = 300  # 1000 * len(words)
+    last_fitness = float("inf")
     while True:
         population = evolution_step(population, offsprings_size)
         best_individual = population[-1]
         best_fitness = best_individual.get_fitness()
-        # if last_fitness != float("inf"):
-        #     if best_fitness == last_fitness:
-        #         same_fitness += 1
-        #     else:
-        #         same_fitness = 0
-        # if same_fitness >= same_threshold:
-        #     population = initial_population(words, population_size)
-        #     same_fitness = 0
-        # last_fitness = best_fitness
+        if last_fitness != float("inf"):
+            if best_fitness == last_fitness:
+                same_fitness += 1
+            else:
+                same_fitness = 0
+        if same_fitness >= same_threshold:
+            population = initial_population(words, population_size)
+            same_fitness = 0
+        last_fitness = best_fitness
 
-        fitness_change.append(best_fitness)
+        if WRITE_STATISTICS:
+            fitness_change.append(best_fitness)
 
-        if generation % 100 == 0:
+        if WRITE_STATISTICS and generation % 100 == 0:
             print("-" * 20)
             print(f"Generation #{generation}")
             print(f"Fitness: {best_fitness}")
@@ -310,16 +405,18 @@ def solution(words: list[str], population_size: int = 100, offsprings_size: int 
             break
         generation += 1
 
-    print("-" * 20)
-    print(f"Generation #{generation}")
-    print(f"Fitness: {best_fitness}")
-    print(best_individual)
-    print()
-    plt.plot(fitness_change)
-    plt.title("Change of a fitness score")
-    plt.xlabel("Generation")
-    plt.ylabel("Fitness score")
-    plt.show()
+    if WRITE_STATISTICS:
+        print("-" * 20)
+        print(f"Generation #{generation}")
+        print(f"Fitness: {best_fitness}")
+        print(best_individual)
+        print()
+        if plt:
+            plt.plot(fitness_change)
+            plt.title("Change of a fitness score")
+            plt.xlabel("Generation")
+            plt.ylabel("Fitness score")
+            plt.show()
 
     return best_individual, generation, best_fitness
 
@@ -358,17 +455,34 @@ def read_words(path: str) -> list[str]:
     return words
 
 
-def main(inputs_dir: str = "vlad", outputs_dir: str = "outputs") -> None:
+def main(inputs_dir: str = "gleb", outputs_dir: str = "outputs") -> None:
+    """The main function of the solution that reads the input files from `inputs_dir`
+    runs the solution on a test, and writes the output with solution to `outputs_dir`.
+
+    Args:
+        inputs_dir (str, optional): Name of the input directory. Defaults to "inputs".
+        outputs_dir (str, optional): Name of the output directory. Defaults to "outputs".
+    """
+    # prepend the path to the directory with our script
+    inputs_dir = os.path.join(__location__, inputs_dir)
+    outputs_dir = os.path.join(__location__, outputs_dir)
+
+    # get input files (sorted by number of words in it)
     files = get_inputs(inputs_dir)
+    # create the output folder
     prepare_outputs(outputs_dir)
 
+    # open the statistics file if needed
     stat = None
     if WRITE_STATISTICS:
         stat = open("statistics.csv", "w")
         stat.write("test,time,generation,fitness,words\n")
+
     for file in files:
+        # read the words from the file
         words = read_words(os.path.join(inputs_dir, file))
 
+        # check the start time and execute the solution
         start_time = time.time()
         try:
             crossword, generation, best_fitness = solution(words)
@@ -376,12 +490,17 @@ def main(inputs_dir: str = "vlad", outputs_dir: str = "outputs") -> None:
             break
         end_time = time.time()
 
+        # write to output file
         with open(os.path.join(outputs_dir, file.replace("input", "output")), "w") as fp:
             for word in crossword.words:
                 fp.write(str(word) + "\n")
 
+        # write to statistics file if needed
         if WRITE_STATISTICS and stat:
-            stat.write(f"{file},{end_time-start_time},{generation},{best_fitness},{len(words)}\n")
+            stat.write(f"{file},{round(end_time-start_time, 3)},{generation},{best_fitness},{len(words)}\n")
+            stat.flush()
+
+    # close the statistics file if needed
     if WRITE_STATISTICS and stat:
         stat.close()
 
