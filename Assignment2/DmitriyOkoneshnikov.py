@@ -590,7 +590,7 @@ def solution(
 
         if WRITE_STATISTICS:
             fitness_change.append(best_fitness)
-            if generation % 100 == 0:
+            if generation % 1000 == 0:
                 print("-" * 20)
                 print(f"Generation #{generation}")
                 print(f"Fitness: {best_fitness}")
@@ -610,13 +610,13 @@ def solution(
         print(f"Generation #{generation}")
         print(f"Fitness: {best_fitness}")
         print(best_individual)
-        print()
-        if plt:
-            plt.plot(fitness_change)
-            plt.title("Change of a fitness score")
-            plt.xlabel("Generation")
-            plt.ylabel("Fitness score")
-            plt.show()
+        # print()
+        # if plt:
+        #     plt.plot(fitness_change)
+        #     plt.title("Change of a fitness score")
+        #     plt.xlabel("Generation")
+        #     plt.ylabel("Fitness score")
+        #     plt.show()
 
     return best_individual, generation, best_fitness
 
@@ -691,7 +691,7 @@ def read_words(path: str) -> list[str]:
     return words
 
 
-def main(inputs_dir: str = "__inputs", outputs_dir: str = "outputs") -> None:
+def main(inputs_dir: str = "inputs", outputs_dir: str = "outputs") -> None:
     """The main function of the program that reads the input files from `inputs_dir`
     runs the solution on a test, and writes the output with solution to `outputs_dir`.
 
