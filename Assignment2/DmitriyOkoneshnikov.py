@@ -197,8 +197,17 @@ class Word:
 
 class Crossword:
     def __init__(self, words: list[str], N: int = 20):
+        """Create crossword with given words.
+        The location and direction are randomly generated.
+        A unique component for all words is assigned (later it is processed by fitness function).
+
+        Args:
+            words (list[str]): List of words
+            N (int, optional): Size of the grid. Defaults to 20.
+        """
         self.N = N
         self.fitness: float | None = None
+        # if self.components[i] is True, then component `i` exists
         self.components: list[bool] = [False] * len(words)
 
         self.words: list[Word] = []
@@ -206,43 +215,68 @@ class Crossword:
             direction = Direction.HORIZONTAL if random.random() < 0.5 else Direction.VERTICAL
             dx = len(word) if direction == Direction.VERTICAL else 0
             dy = len(word) if direction == Direction.HORIZONTAL else 0
+            # make sure not to generate words outside of the grid
             x0, y0 = randint(0, N - 1 - dx), randint(0, N - 1 - dy)
             self.words.append(Word(word, Point(x0, y0), direction, i))
             self.components[i] = True
 
     def get_fitness(self) -> float:
+        """Calculates the fitness function.
+        It implements lazy loading: fitness score is calculated on demand and an existing
+        value is returned afterwards.
+        Can force to recalculate the fitness score by setting `self.fitness = None`.
+
+        The fitness function takes into account whether:
+            * two words intersect
+            * two words intersect at the same character
+            * the words are in one component
+            * two parallel words are not located too close
+            * two perpendicular words are not located too close
+        For any violation, a different penalty is given.
+        The fitness score equals to -penalty.
+        Returns:
+            float: The fitness score
+        """
         if self.fitness is not None:
             return self.fitness
 
         penalty = 0
-        intersections = [False for _ in range(len(self.words))]
         for i in range(len(self.words)):
             word1 = self.words[i]
             for j in range(i + 1, len(self.words)):
                 word2 = self.words[j]
 
+                # whether two words intersect
                 intersection = word1.intersects(word2)
                 if intersection:
-                    intersections[i] = True
-                    intersections[j] = True
                     intersection1, intersection2 = intersection
+                    # whether two words intersect at the same character
                     if word1.word[intersection1] != word2.word[intersection2]:
                         penalty += abs(ord(word1.word[intersection1]) - ord(word2.word[intersection2]))  # 3
 
+                    # unite components
                     if word1.component != word2.component:
+                        # if both components exist, then we remove one and unite them
                         if self.components[word1.component] and self.components[word2.component]:
                             self.components[word1.component] = False
                             word1.component = word2.component
+                        # if only the first component exists, unite with first
                         elif self.components[word1.component] and not self.components[word2.component]:
                             word2.component = word1.component
+                        # if only the second component exists, unite with second
                         else:
                             word1.component = word2.component
 
+                # whether two parallel words are not located too close
                 penalty += word1.parallel_close(word2) * 8
 
+                # whether two perpendicular words are not located too close
                 if word1.intersect_close(word2):
                     penalty += 30
+
+        # whether the words are in one component
         penalty += (sum(self.components) - 1) * 12
+
         return -penalty
 
     def __str__(self) -> str:
