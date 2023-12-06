@@ -1,5 +1,8 @@
 Assignment1/local_tests/
 Assignment2/*/*.txt
+Assignment2/word_generator.py
+Assignment2/crossprinter
+
 
 *.csv
 *.ods
