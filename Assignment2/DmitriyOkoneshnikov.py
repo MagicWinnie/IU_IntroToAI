@@ -301,12 +301,33 @@ class Crossword:
 
 
 def initial_population(words: list[str], population_size: int) -> list[Crossword]:
+    """Generate an initial random population of size `population_size` sorted by their fitness values.
+    Based on a function from lab 10.
+
+    Args:
+        words (list[str]): List of words
+        population_size (int): Population size (length of the output list)
+
+    Returns:
+        list[Crossword]: Population
+    """
     population = [Crossword(words) for _ in range(population_size)]
     population.sort(key=lambda x: x.get_fitness())
     return population
 
 
 def replace_population(population: list[Crossword], new_individuals: list[Crossword]) -> list[Crossword]:
+    """Append new children into the existing population, sort the population by their fitness value, and
+    return the best `len(population)` of the new population.
+    Based on a function from lab 10.
+
+    Args:
+        population (list[Crossword]): Existing population
+        new_individuals (list[Crossword]): New children
+
+    Returns:
+        list[Crossword]: New population
+    """
     size = len(population)
     population.extend(new_individuals)
     population.sort(key=lambda x: x.get_fitness())
@@ -314,17 +335,40 @@ def replace_population(population: list[Crossword], new_individuals: list[Crossw
 
 
 def get_parents(population: list[Crossword], offsprings_size: int) -> tuple[list[Crossword], list[Crossword]]:
+    """Return 2 parents of size `offsprings_size` each for future breeding.
+    Based on a function from lab 10.
+
+    Args:
+        population (list[Crossword]): Population to get parents from
+        offsprings_size (int): Size of parent lists
+
+    Returns:
+        tuple[list[Crossword], list[Crossword]]: Two parents
+    """
     mothers = population[-2 * offsprings_size :: 2]
     fathers = population[-2 * offsprings_size + 1 :: 2]
     return mothers, fathers
 
 
 def cross(mother: Crossword, father: Crossword) -> Crossword:
+    """Crossover function. It gets genes from mother and father, and creates a child.
+    It performs a one point crossover.
+
+    Args:
+        mother (Crossword): A mother crossword
+        father (Crossword): A father crossword
+
+    Returns:
+        Crossword: Their child
+    """
+    # create an empty child (Doctor Who reference)
     crossword = Crossword([])
     crossword.fitness = None
     crossword.components = [False] * len(mother.words)
 
+    # find a point to work around it
     index = randint(0, len(mother.words) - 1)
+    # before the point we put mothers' genes
     for i in range(0, index):
         word = Word(
             mother.words[i].word,
@@ -332,8 +376,10 @@ def cross(mother: Crossword, father: Crossword) -> Crossword:
             mother.words[i].direction,
             mother.words[i].component,
         )
+        # put unique components for fitness function to fix
         crossword.words.append(word)
         crossword.components[i] = True
+    # after the point we put father' genes
     for i in range(index, len(mother.words)):
         word = Word(
             father.words[i].word,
@@ -341,6 +387,7 @@ def cross(mother: Crossword, father: Crossword) -> Crossword:
             father.words[i].direction,
             father.words[i].component,
         )
+        # put unique components for fitness function to fix
         crossword.words.append(word)
         crossword.components[i] = True
 
@@ -365,20 +412,33 @@ def cross(mother: Crossword, father: Crossword) -> Crossword:
     return crossword
 
 
-def mutate(offspring: Crossword, probability) -> Crossword:
+def mutate(offspring: Crossword, probability: float) -> Crossword:
+    """Mutation function. It mutates every gene with a `probability`.
+    If a gene is chosen to be mutated, then its location and direction are changed randomly.
+
+    Args:
+        offspring (Crossword): A crossword to be mutated
+        probability (float): Probability that one gene will be mutated
+
+    Returns:
+        Crossword: A mutated crossword
+    """
+    # reset the components
     offspring.components = [False] * len(offspring.words)
     for i in range(len(offspring.words)):
         if random.random() < probability:
             direction = Direction.HORIZONTAL if random.random() < 0.5 else Direction.VERTICAL
             dx = len(offspring.words[i].word) if direction == Direction.VERTICAL else 0
             dy = len(offspring.words[i].word) if direction == Direction.HORIZONTAL else 0
+            # make sure the words generate inside the grid
             x0, y0 = randint(0, offspring.N - 1 - dx), randint(0, offspring.N - 1 - dy)
 
             offspring.words[i].point = Point(x0, y0)
             offspring.words[i].direction = direction
+        # assign unique components so the fitness function can later work with them
         offspring.words[i].component = i
         offspring.components[i] = True
-
+    # reset the fitness value so it is recalculated later
     offspring.fitness = None
     return offspring
 
