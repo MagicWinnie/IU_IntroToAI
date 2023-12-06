@@ -444,6 +444,18 @@ def mutate(offspring: Crossword, probability: float) -> Crossword:
 
 
 def evolution_step(population: list[Crossword], offsprings_size: int, mutation_rate: float = 0.4) -> list[Crossword]:
+    """One step in evolution. It gets parents from an existing population of size `offsprings_size`,
+    does crossover and mutation on them, and finally gets the best children to the next generation.
+    Based on a function from lab 10.
+
+    Args:
+        population (list[Crossword]): Existing population
+        offsprings_size (int): Size of parents
+        mutation_rate (float, optional): At which probability a gene is mutated. Defaults to 0.4.
+
+    Returns:
+        list[Crossword]: New population
+    """
     mothers, fathers = get_parents(population, offsprings_size)
     offsprings = []
 
@@ -455,8 +467,24 @@ def evolution_step(population: list[Crossword], offsprings_size: int, mutation_r
 
 
 def solution(words: list[str], population_size: int = 100, offsprings_size: int = 40) -> tuple[Crossword, int, float]:
+    """The main function of the solution.
+    It generates an initial population, runs evolution until a valid crossword
+    is generated (fitness value = 0, as there is no penalty).
+    If the evolution is stuck at some fitness value, it regenerates the population
+    and starts over.
+    Based on a function from lab 10.
+
+    Args:
+        words (list[str]): List of words
+        population_size (int, optional): Size of the population. Defaults to 100.
+        offsprings_size (int, optional): Size of parents. Defaults to 40.
+
+    Returns:
+        tuple[Crossword, int, float]: Generated crossword, number of generations, and fitness value
+    """
     population = []
     best_fitness = -float("inf")
+    # generate five populations and get the one with highest fitness value
     for _ in range(5):
         population_ = initial_population(words, population_size)
         best_fitness_ = population_[-1].get_fitness()
@@ -472,9 +500,12 @@ def solution(words: list[str], population_size: int = 100, offsprings_size: int 
     same_threshold = 300  # 1000 * len(words)
     last_fitness = float("inf")
     while True:
+        # do one step of evolution
         population = evolution_step(population, offsprings_size)
+        # get the best individual
         best_individual = population[-1]
         best_fitness = best_individual.get_fitness()
+        # check if we need to regenerate the population
         if last_fitness != float("inf"):
             if best_fitness == last_fitness:
                 same_fitness += 1
@@ -487,14 +518,14 @@ def solution(words: list[str], population_size: int = 100, offsprings_size: int 
 
         if WRITE_STATISTICS:
             fitness_change.append(best_fitness)
+            if generation % 100 == 0:
+                print("-" * 20)
+                print(f"Generation #{generation}")
+                print(f"Fitness: {best_fitness}")
+                print(best_individual)
+                print()
 
-        if WRITE_STATISTICS and generation % 100 == 0:
-            print("-" * 20)
-            print(f"Generation #{generation}")
-            print(f"Fitness: {best_fitness}")
-            print(best_individual)
-            print()
-
+        # condition on exiting evolution
         if best_fitness == 0:
             break
         generation += 1
@@ -586,7 +617,7 @@ def read_words(path: str) -> list[str]:
 
 
 def main(inputs_dir: str = "gleb", outputs_dir: str = "outputs") -> None:
-    """The main function of the solution that reads the input files from `inputs_dir`
+    """The main function of the program that reads the input files from `inputs_dir`
     runs the solution on a test, and writes the output with solution to `outputs_dir`.
 
     Args:
