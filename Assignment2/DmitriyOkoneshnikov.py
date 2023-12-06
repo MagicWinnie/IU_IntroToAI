@@ -160,6 +160,7 @@ class Word:
                 delta = min(self.point.y + len(self.word) - 1, other.point.y + len(other.word) - 1) - max(
                     self.point.y, other.point.y
                 )
+                # potentially creating new words
                 if delta == 0:
                     return -1
                 return delta
@@ -187,6 +188,7 @@ class Word:
                 delta = min(self.point.x + len(self.word) - 1, other.point.x + len(other.word) - 1) - max(
                     self.point.x, other.point.x
                 )
+                # potentially creating new words
                 if delta == 0:
                     return -1
                 return delta
@@ -289,7 +291,9 @@ class Crossword:
         if self.fitness is not None:
             return self.fitness
 
+        # dictionary that stores intersections
         intersections: dict[int, set[int]] = {i: set() for i in range(len(self.words))}
+        # set of two words that could potentially create a new word without third word intersection
         possible_does_not_cross: set[tuple[int, int]] = set()
 
         penalty = 0
@@ -337,6 +341,7 @@ class Crossword:
         # whether the words are in one component
         penalty += (sum(self.components) - 1) * 12
 
+        # check so two adjacent words do not create a new word
         for possible1, possible2 in possible_does_not_cross:
             if not intersections[possible1].intersection(intersections[possible2]):
                 penalty += 1
@@ -564,7 +569,7 @@ def solution(
     generation = 0
 
     same_fitness = 0
-    same_threshold = 400 * len(words)
+    same_threshold = 500 * len(words)
     last_fitness = float("inf")
     while True:
         # do one step of evolution
