@@ -3,8 +3,10 @@ Assignment2/*/*.txt
 Assignment2/word_generator.py
 Assignment2/crossprinter
 
+!Assignment2/inputs/*.txt
+!Assignment2/outputs/*.txt
 
-*.csv
+# *.csv
 *.ods
 
 ## Core latex/pdflatex auxiliary files:
