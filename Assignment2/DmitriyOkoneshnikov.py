@@ -190,31 +190,53 @@ class Word:
         return 0
 
     def intersect_close(self, other: Word) -> bool:
+        """Check whether two perpendicular words are located next to each other.
+        For example, at the beginning or end of the another word.
+
+        Args:
+            other (Word): Another word to check with
+
+        Returns:
+            bool: Whether two perpendicular words are located next to each other
+        """
+        # we are interested in perpendicular words
         if self.direction == other.direction:
             return False
+        # check when the first word is horizontal
         if self.direction == Direction.HORIZONTAL:
+            # check when the second word is upper relative to the first word
             if other.point.x <= self.point.x <= other.point.x + len(other.word) - 1 and (
                 self.point.y - 1 == other.point.y or other.point.y == self.point.y + len(self.word)
             ):
                 return True
+            # check when the second word is lower relative to the first word
             if (other.point.x - 1 == self.point.x or other.point.x + len(other.word) == self.point.x) and (
                 self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
                 or other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
             ):
                 return True
+        # check when the first word is vertical
         else:
+            # check when the second word is upper relative to the first word
             if self.point.x <= other.point.x <= self.point.x + len(self.word) - 1 and (
                 other.point.y - 1 == self.point.y or self.point.y == other.point.y + len(other.word)
             ):
                 return True
+            # check when the second word is lower relative to the first word
             if (self.point.x - 1 == other.point.x or self.point.x + len(self.word) == other.point.x) and (
                 other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
                 or self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
             ):
                 return True
+        # everything is fine
         return False
 
     def __str__(self) -> str:
+        """Return string representation of a crossword like in problem statements.
+
+        Returns:
+            str: String representation of a crossword
+        """
         return f"{self.point} {self.direction.value}"
 
 
