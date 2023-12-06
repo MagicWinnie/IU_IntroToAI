@@ -597,14 +597,14 @@ def solution(
     return best_individual, generation, best_fitness
 
 
-def get_number_input(path: str, prefix: str = "input") -> str:
+def get_number_input(path: str, prefix: str) -> str:
     """Get the number of the test from the file name.
     If the input file is not named in the following way: <prefix>N.txt,
     the function will return whatever is between prefix and file type.
 
     Args:
         path (str): Path to input file
-        prefix (str, optional): What prefix is used in file names. Defaults to "input".
+        prefix (str): What prefix is used in file names
 
     Returns:
         str: Number of the test from the file name
@@ -615,11 +615,11 @@ def get_number_input(path: str, prefix: str = "input") -> str:
     return file_name
 
 
-def get_inputs(directory: str = "inputs") -> list[str]:
+def get_inputs(directory: str) -> list[str]:
     """Return list of input file names sorted by number of lines in them.
 
     Args:
-        directory (str, optional): Path to the input directory. Defaults to "inputs".
+        directory (str): Path to the input directory
 
     Raises:
         FileNotFoundError: The directory does not exist
@@ -642,11 +642,11 @@ def get_inputs(directory: str = "inputs") -> list[str]:
     return [file for _, file in sorted(zip(lines, files))]
 
 
-def prepare_outputs(directory: str = "outputs") -> None:
+def prepare_outputs(directory: str) -> None:
     """Create output directory if it does not exist.
 
     Args:
-        directory (str, optional): Path to the output directory. Defaults to "outputs".
+        directory (str): Path to the output directory
     """
     if not os.path.isdir(directory):
         os.mkdir(directory)
