@@ -10,7 +10,7 @@ from dataclasses import dataclass
 #     * printing info about generation
 #     * plotting the fitness change
 #     * write execution time to file
-WRITE_STATISTICS = True
+WRITE_STATISTICS = False
 # we need matplotlib to plot
 if WRITE_STATISTICS:
     from matplotlib import pyplot as plt
@@ -691,7 +691,7 @@ def read_words(path: str) -> list[str]:
     return words
 
 
-def main(inputs_dir: str = "gleb", outputs_dir: str = "outputs") -> None:
+def main(inputs_dir: str = "inputs", outputs_dir: str = "outputs") -> None:
     """The main function of the program that reads the input files from `inputs_dir`
     runs the solution on a test, and writes the output with solution to `outputs_dir`.
 
