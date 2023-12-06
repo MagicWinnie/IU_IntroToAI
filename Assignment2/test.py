@@ -1,5 +1,5 @@
 import unittest
-from main import Word, Point, Direction
+from DmitriyOkoneshnikov import Word, Point, Direction
 
 
 class TestFitness(unittest.TestCase):
