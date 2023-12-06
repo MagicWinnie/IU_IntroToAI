@@ -488,7 +488,7 @@ def mutate(offspring: Crossword, probability: float) -> Crossword:
     return offspring
 
 
-def evolution_step(population: list[Crossword], offsprings_size: int, mutation_rate: float = 0.4) -> list[Crossword]:
+def evolution_step(population: list[Crossword], offsprings_size: int, mutation_rate: float = 0.3) -> list[Crossword]:
     """One step in evolution. It gets parents from an existing population of size `offsprings_size`,
     does crossover and mutation on them, and finally gets the best children to the next generation.
     Based on a function from lab 10.
@@ -512,7 +512,7 @@ def evolution_step(population: list[Crossword], offsprings_size: int, mutation_r
 
 
 def solution(
-    words: list[str], start_time: float, population_size: int = 100, offsprings_size: int = 40
+    words: list[str], start_time: float, population_size: int = 180, offsprings_size: int = 60
 ) -> tuple[Crossword, int, float]:
     """The main function of the solution.
     It generates an initial population, runs evolution until a valid crossword
@@ -545,7 +545,7 @@ def solution(
     generation = 0
 
     same_fitness = 0
-    same_threshold = 300  # 1000 * len(words)
+    same_threshold = 400 * len(words)
     last_fitness = float("inf")
     while True:
         # do one step of evolution
@@ -667,7 +667,7 @@ def read_words(path: str) -> list[str]:
     return words
 
 
-def main(inputs_dir: str = "gleb", outputs_dir: str = "outputs") -> None:
+def main(inputs_dir: str = "__inputs", outputs_dir: str = "outputs") -> None:
     """The main function of the program that reads the input files from `inputs_dir`
     runs the solution on a test, and writes the output with solution to `outputs_dir`.
 
