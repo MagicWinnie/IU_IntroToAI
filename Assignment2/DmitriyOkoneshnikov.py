@@ -122,48 +122,71 @@ class Word:
         return None
 
     def parallel_close(self, other: Word) -> int:
+        """Check if two parrallel words satisfy the requirements about:
+            * one being right after the other
+            * one word being inside the other
+            * parallel words are adjacent
+
+        Args:
+            other (Word): Another word to check with
+
+        Returns:
+            int: Number of characters create issues (0 if none)
+        """
+        # we are interested only in parallel words
         if self.direction != other.direction:
             return 0
         if self.direction == Direction.HORIZONTAL:
+            # and these words should be close to each other
             if abs(self.point.x - other.point.x) > 1:
                 return 0
+            # check for overlapping words and words at the end or beginning of another word
             if self.point.x == other.point.x and (
                 self.point.y + len(self.word) - 1 >= other.point.y + len(other.word) - 1 >= self.point.y - 1
                 or other.point.y + len(other.word) - 1 >= self.point.y + len(self.word) - 1 >= other.point.y - 1
             ):
+                # calculate number of affected characters
                 delta = abs(
                     min(self.point.y + len(self.word) - 1, other.point.y + len(other.word) - 1)
                     - max(self.point.y, other.point.y)
                 )
                 return delta
+            # check for "overlapping" words in adjacent rows
             elif (
                 self.point.y <= other.point.y <= self.point.y + len(self.word) - 1
                 or other.point.y <= self.point.y <= other.point.y + len(other.word) - 1
             ):
+                # calculate number of affected characters
                 delta = min(self.point.y + len(self.word) - 1, other.point.y + len(other.word) - 1) - max(
                     self.point.y, other.point.y
                 )
                 return delta
         else:
+            # and these words should be close to each other
             if abs(self.point.y - other.point.y) > 1:
                 return 0
+            # check for overlapping words and words at the end or beginning of another word
             if self.point.y == other.point.y and (
                 self.point.x + len(self.word) - 1 >= other.point.x + len(other.word) - 1 >= self.point.x - 1
                 or other.point.x + len(other.word) - 1 >= self.point.x + len(self.word) - 1 >= other.point.x - 1
             ):
+                # calculate number of affected characters
                 delta = abs(
                     min(self.point.x + len(self.word) - 1, other.point.x + len(other.word) - 1)
                     - max(self.point.x, other.point.x)
                 )
                 return delta
+            # check for "overlapping" words in adjacent columns
             elif (
                 self.point.x <= other.point.x <= self.point.x + len(self.word) - 1
                 or other.point.x <= self.point.x <= other.point.x + len(other.word) - 1
             ):
+                # calculate number of affected characters
                 delta = min(self.point.x + len(self.word) - 1, other.point.x + len(other.word) - 1) - max(
                     self.point.x, other.point.x
                 )
                 return delta
+        # everything is fine
         return 0
 
     def intersect_close(self, other: Word) -> bool:
